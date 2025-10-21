@@ -1,4 +1,4 @@
-# master_docentes_lf.R  — robusto y simple
+# master_docentes_lf.R
 rm(list = ls())
 
 if (!require("pacman")) install.packages("pacman")
@@ -12,7 +12,7 @@ AUD <- file.path(SCRIPTS_DIR, "2_auditoria.R")
 EXP <- file.path(SCRIPTS_DIR, "3_export.R")
 
 # 1) Cargar credenciales
-dotenv::load_dot_env(".env")   # (si ves el warning, agrega un Enter al final del .env y guarda)
+dotenv::load_dot_env(".env")   
 
 server          <- Sys.getenv("SERVIDOR")
 email           <- Sys.getenv("EMAIL_DOCENTES", unset = Sys.getenv("EMAIL"))

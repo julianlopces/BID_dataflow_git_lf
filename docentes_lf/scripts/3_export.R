@@ -2,10 +2,6 @@
 # --------------------------------------------------------------
 # Export Docentes LF -> Google Sheets (Looker)
 # Requiere objetos:
-#   - alertas  (tabla auditada)
-#   - data     (raw del import)
-#   - temp_creds_file  (ruta al JSON de service account)
-#   - id_alertas       (ID del Google Sheet destino)
 # --------------------------------------------------------------
 
 message("==> Export Docentes LF iniciado")
@@ -28,7 +24,7 @@ if (!is.data.frame(alertas)) {
   stop("`alertas` no es un data.frame/tibble. Corre 2_auditoria.R en esta sesión antes del export.")
 }
 
-# Autenticación (si no lo hiciste en el master)
+# Autenticación 
 suppressMessages({
   googledrive::drive_auth(path = temp_creds_file, cache = ".secrets")
   googlesheets4::gs4_auth(path = temp_creds_file)

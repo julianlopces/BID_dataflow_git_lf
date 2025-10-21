@@ -1,12 +1,6 @@
 # docentes_lf/scripts/1_import.R
 # --------------------------------------------------------------
-# Import Docentes LF (SurveyCTO -> R)  |  sin plantilla
-# - Descarga wide JSON
-# - Limpia strings y pilotos básicos
-# - Construye nombre completo del docente a partir de:
-#   teacher_name_1, teacher_name_2, teacher_lastname_1, teacher_lastname_2
-#   y su segundo bloque *_99 (fallback)
-# - Guarda CSV y RDS en docentes_lf/data/
+# Import Docentes LF
 # --------------------------------------------------------------
 
 message("==> Import Docentes LF iniciado")
