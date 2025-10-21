@@ -27,7 +27,7 @@ export_sheet <- function(df, ss, sheet_name, label = sheet_name, pause = 0) {
 export_sheet(alertas,             sheet, "alertas_estudiantes",  label = "alertas",                 pause = 5)
 export_sheet(data        ,        sheet, "data_raw",             label = "datos crudos",            pause = 5)
 export_sheet(alertas_encuestadores, sheet, "alertas_encuestadores",label = "encuestadores",         pause = 5)
-export_sheet(seguimiento_colegios, sheet, "seguimiento_colegios", label = "colegios",         pause = 5)
+export_sheet(seguimiento_colegios_2, sheet, "seguimiento_colegios", label = "colegios",         pause = 5)
 
 
 message("✅ Todos los datos fueron exportados exitosamente.")

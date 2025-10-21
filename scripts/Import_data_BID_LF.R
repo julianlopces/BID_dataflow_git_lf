@@ -209,3 +209,8 @@ data <- data %>%
   filter(!username %in% c("anonymousUser"),deviceid != "(web)")
 
 
+data <- data %>%
+  filter(!student_id %in% c(1:25))
+
+
+
