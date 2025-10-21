@@ -691,9 +691,10 @@ seguimiento_colegios <- alertas_sin_duplicados %>%
   mutate(
     en_lista = student_id_yesno == "1" & assent == "1",
     sin_lista = student_id_yesno == "2" & assent == "1",
-    colegio_final = coalesce(colegio_str, colegio_pull)
+    colegio_final = coalesce(colegio_str, colegio_pull),
+    school_final = coalesce(colegio_pull_id,school_final)
   ) %>%
-  group_by(colegio_final) %>%
+  group_by(colegio_final, school_final) %>%
   summarise(
     total_encuestas = n(),
     Rechazos = sum(flag_rejected, na.rm = TRUE),
@@ -704,13 +705,28 @@ seguimiento_colegios <- alertas_sin_duplicados %>%
     sin_lista = sum(sin_lista, na.rm = TRUE),
     alertas = sum(Alertas, na.rm = TRUE),
     exitos = sum(Exitos, na.rm = TRUE),
-    tratamiento = first(tratamiento)
+    tratamiento = first(tratamiento),
+    l_base = sum(as.numeric(lb_pull),na.rm = TRUE),
+    exitos_lb = sum(if_else(Exitos == 1 & lb_pull == 1,1,0), na.rm = TRUE)
   )%>%
   filter(!is.na(colegio_final))
 
 
+# Agregar meta de lb
+
+lbase <- read_sheet(id_alertas,
+                 sheet = "meta_lb")
+
+lbase$COD_COLEGIO <- as.character(lbase$COD_COLEGIO)
 
 
+seguimiento_colegios_2 <- lbase %>%
+  full_join(seguimiento_colegios, by = c("COD_COLEGIO" = "school_final"))%>%
+  mutate(tratamiento = if_else(COD_COLEGIO %in% colegios_tratamiento,
+                               "Tramiento","Control"),
+         avance_total = (exitos/TOTAL) * 100,
+         avance_lb = (exitos_lb/TOTAL_LB) * 100 )
+  
 # Confirmación de finalización
 message("Alertas creadas exitosamente.")
 
