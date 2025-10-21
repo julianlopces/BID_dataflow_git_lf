@@ -47,3 +47,6 @@ build/
 # NO ignorar el archivo .Rproj
 !*.Rproj
 *.rds
+.Rproj.user
+.httr-oauth
+.quarto
