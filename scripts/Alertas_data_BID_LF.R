@@ -1,30 +1,5 @@
 ##### Extraer tracking
 
-#alertas_tracking <- data %>%
-#  filter(assent == 2)%>%
-#  mutate(
-#    # Extraer UUID corto
-#    student_id_uuid = substr(KEY, 6, 10),
-#    
-#    # Priorizar student_id, si no usar UUID corto
-#    student_id_final = coalesce(student_id, student_id_uuid),
-#    
-#    # Convertir endtime a fecha-hora
-#    endtime_parsed = mdy_hms(endtime),
-#    
-#    # Consolidar info de colegio, sede, curso, jornada
-#    school_final = coalesce(as.character(colegio_pull_id), as.character(student_school_reject)),
-#    sede_final = coalesce(as.character(sede_pull_id), as.character(student_sede_reject)),
-#    curso_final = coalesce(as.character(curso_pull), as.character(student_fifth_l_reject)),
-#    jornada_final = coalesce(jornada_pull, student_shift_reject),
-#    colegio_str = coalesce(colegio_pull, colegio_str_reject),
-#    sede_str = coalesce(sede_pull,sede_str_reject),
-#    
-#    # Construir código compuesto
-#    codigo_compuesto = paste(school_final, sede_final, curso_final, jornada_final, sep = "_")
-#  )
-
-
 
 #### Alertas ####
 

@@ -203,6 +203,8 @@ data <- data %>%
   # Coalesce por columnas: toma, en cada fila, el primer no-NA entre las 20 columnas
   mutate(aldea_preguntas_total = coalesce(!!!syms(vars2)))
 
+# Unificar datos
+
 # Eliminar pilotos
 
 data <- data %>%
