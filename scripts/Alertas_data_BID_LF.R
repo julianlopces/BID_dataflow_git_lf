@@ -441,6 +441,11 @@ alertas <- alertas %>%
 
 table(alertas$Exitos)
 
+
+alertas <- alertas %>%
+  mutate(Exitos = if_else(assent == 2,0,Exitos),
+         Alertas = if_else(assent == 2, 0, Alertas))
+
 ## Agregar tratamiento/control
 
 colegios_tratamiento <- c(
