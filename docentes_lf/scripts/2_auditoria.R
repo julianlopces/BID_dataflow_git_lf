@@ -12,6 +12,87 @@ if (!exists("data")) stop("No existe `data` desde el import. Corre 1_import prim
 dataset <- data
 cols_api_order <- names(dataset)   # orden original del import (API + tus nuevas de import)
 
+# -- Merge con crudas_lb por teacher_fullname2 (shift/fifth) ------------------
+safe_lib(c("readr","dplyr","stringr"))
+
+# 1) Importar crudas
+crudas_path <- "crudas_lb.csv"  # ajusta ruta si aplica
+crudas <- readr::read_csv(crudas_path, show_col_types = FALSE)
+
+# 2) Alinear llave como character en ambas
+dataset$teacher_fullname2 <- as.character(dataset$teacher_fullname2)
+crudas$teacher_fullname2  <- as.character(crudas$teacher_fullname2)
+
+# 3) Columnas a jalar
+cols_pull <- grep("^(teacher_shift_|teacher_fifth_)", names(crudas), value = TRUE)
+
+if (length(cols_pull) > 0 && "teacher_fullname2" %in% names(crudas)) {
+  # 4) Subconjunto y limpieza básica  (solo convertir ""->NA si la columna es character)
+  crudas_sub <- crudas %>%
+    dplyr::select(teacher_fullname2, dplyr::all_of(cols_pull)) %>%
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(cols_pull),
+        ~ {
+          v <- .
+          if (is.character(v)) dplyr::na_if(v, "") else v
+        }
+      )
+    ) %>%
+    dplyr::filter(!is.na(teacher_fullname2))
+  
+  
+  # 5) Asegurar que las columnas existan en dataset (crearlas con el tipo de crudas)
+  for (cc in cols_pull) {
+    if (!cc %in% names(dataset)) {
+      if (cc %in% names(crudas_sub) && is.numeric(crudas_sub[[cc]])) {
+        dataset[[cc]] <- as.numeric(NA)
+      } else {
+        dataset[[cc]] <- as.character(NA)
+      }
+    }
+  }
+  
+  # 6) Join
+  dataset <- dataset %>%
+    left_join(crudas_sub, by = "teacher_fullname2", suffix = c("", "__cru"))
+  
+  # 7) Coalesce columna por columna, armonizando tipos
+  for (cc in cols_pull) {
+    cru_col <- paste0(cc, "__cru")
+    if (!cru_col %in% names(dataset)) next
+    
+    lhs <- dataset[[cc]]
+    rhs <- dataset[[cru_col]]
+    
+    lhs_num <- is.numeric(lhs)
+    rhs_num <- is.numeric(rhs)
+    
+    if (lhs_num && rhs_num) {
+      # ambos numéricos
+      dataset[[cc]] <- dplyr::coalesce(rhs, lhs)
+    } else {
+      # hay mezcla de tipos -> coalesce como texto
+      lhs_chr <- as.character(lhs)
+      rhs_chr <- as.character(rhs)
+      merged  <- dplyr::coalesce(rhs_chr, lhs_chr)
+      
+      # Si alguna de las dos columnas originales era numérica, intenta reconvertir
+      if (lhs_num || rhs_num) {
+        dataset[[cc]] <- suppressWarnings(as.numeric(merged))
+      } else {
+        dataset[[cc]] <- merged
+      }
+    }
+    
+    # eliminar columna temporal del join
+    dataset[[cru_col]] <- NULL
+  }
+} else {
+  message("No se encontraron columnas teacher_shift_/teacher_fifth_ en 'crudas_lb' o falta 'teacher_fullname2'. Merge omitido.")
+}
+
+
 # 1) Duración -----------------------------------------------------------------
 alertas <- dataset
 
@@ -97,24 +178,43 @@ if (length(vars_miss)){
 }
 
 # 3) Exceso de NS/NR (99) -----------------------------------------------------
+# variables explícitas
 vars_99 <- intersect(c(
   "teacher_country","teacher_edu",
   "historias","retos","juegos","intencion_implementacion"
 ), names(alertas))
 
-if (length(vars_99)){
+
+gad_vars <- grep("^gad_[1-7]$", names(alertas), value = TRUE)
+phq_vars <- grep("^phq_[1-9]$", names(alertas), value = TRUE)
+
+# Unificar y asegurar que existan en el data.frame
+vars_99 <- unique(intersect(c(vars_99, gad_vars, phq_vars), names(alertas)))
+
+if (length(vars_99) > 0) {
   alertas <- alertas %>%
-    mutate(across(all_of(vars_99),
-                  ~ if_else(as.numeric(.x)==99, 1L, 0L, missing = 0L),
-                  .names = "ns_{.col}"))
+    mutate(
+      across(
+        all_of(vars_99),
+        ~ if_else(as.numeric(.x) == 99, 1L, 0L, missing = 0L),
+        .names = "ns_{.col}"
+      )
+    )
+  
   vars_ns <- grep("^ns_", names(alertas), value = TRUE)
+  
   alertas <- alertas %>%
-    mutate(total_ns = if (length(vars_ns)) rowSums(across(all_of(vars_ns)), na.rm = TRUE) else 0L)
+    mutate(
+      total_ns = if (length(vars_ns) > 0) rowSums(across(all_of(vars_ns)), na.rm = TRUE) else 0L
+    )
+  
   media_ns <- mean(alertas$total_ns, na.rm = TRUE)
   sd_ns    <- sd(alertas$total_ns, na.rm = TRUE); if (!is.finite(sd_ns)) sd_ns <- 1
+  
   alertas <- alertas %>%
     mutate(flag_ns = if_else(total_ns > media_ns + 3 * sd_ns, 1L, 0L))
 }
+
 
 # 4) Outliers (edad / nacimiento) --------------------------------------------
 if ("teacher_birth" %in% names(alertas)){
@@ -146,7 +246,7 @@ alertas <- alertas %>%
     )
   )
 
-# 6) Nuevas alertas específicas -----------------------------------------------
+# 6) Alertas específicas -----------------------------------------------
 # a) 'prueba_2' debe ser == 4
 if (!"prueba_2" %in% names(alertas)) alertas$prueba_2 <- NA
 alertas <- alertas %>%
@@ -180,7 +280,7 @@ colegios_match <- unique(lista_match[[1]])
 colegios_excluir <- c(
   "111001012360", "111001076767", "111001800694",
   "111001107778", "111001801268",
-  "111001001279", "111001015601"
+  "111001015601"
 )
 
 alertas <- alertas %>%
@@ -251,7 +351,167 @@ alertas <- alertas %>%
       TRUE ~ NA_character_)
   )
 
-# 8) Rechazos y totales para Looker ------------------------------------------
+# 8)Monitoreo por salones  ----------------------------------------------------------
+
+## Salones con encuesta docente -----------------------------------------------------
+
+library(readr)   
+
+# 0. Ruta 
+ruta_tc <- "tc.csv"
+
+# 1. Leer el CSV  
+tc <- read_csv2(
+  ruta_tc,
+  col_types = cols(
+    control     = col_character(),
+    tratamiento = col_character()
+  )
+)
+
+# 2. Convertir a vectores únicos
+id_tc_control     <- tc %>% pull(control)     %>% na.omit() %>% unique()
+id_tc_tratamiento <- tc %>% pull(tratamiento) %>% na.omit() %>% unique()
+
+# 3. Mapeos turno y salón
+map_turno <- c("1" = "MANANA",
+               "2" = "TARDE",
+               "3" = "UNICA")      
+map_salon <- c(
+  "6"  = "501", "7"  = "502", "8"  = "503", "9"  = "504",
+  "10" = "505", "11" = "506", "12" = "507", "13" = "508",
+  "14" = "509"
+)
+
+# 4. Pasar a largo, construir ID_TC
+alertas_long <- alertas %>%
+  mutate(docente_id = row_number()) %>%        # id auxiliar
+  pivot_longer(
+    cols = starts_with("teacher_fifth_"),
+    names_to = c("turno_code", "salon_code"),
+    names_pattern = "teacher_fifth_(\\d)_(\\d+)",
+    values_to = "dicta",
+    values_drop_na = TRUE                     # descarta NA directamente
+  ) %>%
+  filter(dicta == "1") %>%                    # solo donde dicta
+  mutate(
+    turno = map_turno[turno_code],
+    salon = map_salon[salon_code],
+    ID_TC = paste0(teacher_school, turno, salon)
+  )
+
+# 5. Resumir por docente  →  lista de salones + dummies
+docente_flags <- alertas_long %>%
+  group_by(docente_id) %>%
+  summarise(
+    # lista completa, ordenada y separada por "; "
+    id_tc_list = paste(sort(unique(ID_TC)), collapse = "; "),
+    
+    # dummies tradicionales
+    salon_tratamiento = as.integer(any(ID_TC %in% id_tc_tratamiento)),
+    salon_control     = as.integer(any(ID_TC %in% id_tc_control)),
+    
+    # ➜ NUEVA dummy: ¿al menos un salón pertenece a un colegio excluido?
+    salon_colegio_eliminado = as.integer(
+      any( stringr::str_extract(ID_TC, "^\\d{12}") %in% colegios_excluir )
+    ),
+    .groups = "drop"
+  )
+
+
+# 6. Volver a la tabla principal
+alertas <- alertas %>%
+  mutate(docente_id = row_number()) %>%
+  left_join(docente_flags, by = "docente_id") %>%
+  select(-docente_id)
+
+## Salones sin encuesta docente -----------------------------------------------
+
+
+ids_reportados <- unique(alertas_long$ID_TC)
+
+# -- faltantes totales
+ids_faltantes_trat <- setdiff(id_tc_tratamiento, ids_reportados)
+ids_faltantes_ctrl <- setdiff(id_tc_control,     ids_reportados)
+
+# separar según colegios excluidos 
+extrae_colegio <- function(x) stringr::str_extract(x, "^\\d{12}")
+
+ids_falt_trat_in <- ids_faltantes_trat[ !extrae_colegio(ids_faltantes_trat) %in% colegios_excluir ]
+ids_falt_trat_ex <- ids_faltantes_trat[  extrae_colegio(ids_faltantes_trat) %in% colegios_excluir ]
+
+ids_falt_ctrl_in <- ids_faltantes_ctrl[ !extrae_colegio(ids_faltantes_ctrl) %in% colegios_excluir ]
+ids_falt_ctrl_ex <- ids_faltantes_ctrl[  extrae_colegio(ids_faltantes_ctrl) %in% colegios_excluir ]
+
+# contadores 
+n_trat_in  <- length(ids_falt_trat_in)
+n_trat_ex  <- length(ids_falt_trat_ex)
+n_ctrl_in  <- length(ids_falt_ctrl_in)
+n_ctrl_ex  <- length(ids_falt_ctrl_ex)
+
+# añadir a la tabla principal 
+alertas <- alertas %>%
+  mutate(
+    n_salones_trat_faltantes_in   = n_trat_in,
+    ids_salones_trat_faltantes_in = if (n_trat_in  > 0) paste(ids_falt_trat_in,  collapse = "; ") else NA_character_,
+    n_salones_trat_faltantes_ex   = n_trat_ex,
+    ids_salones_trat_faltantes_ex = if (n_trat_ex  > 0) paste(ids_falt_trat_ex,  collapse = "; ") else NA_character_,
+    
+    n_salones_ctrl_faltantes_in   = n_ctrl_in,
+    ids_salones_ctrl_faltantes_in = if (n_ctrl_in  > 0) paste(ids_falt_ctrl_in,  collapse = "; ") else NA_character_,
+    n_salones_ctrl_faltantes_ex   = n_ctrl_ex,
+    ids_salones_ctrl_faltantes_ex = if (n_ctrl_ex  > 0) paste(ids_falt_ctrl_ex,  collapse = "; ") else NA_character_
+  )
+
+## Desagregación total de salones (conteos basados en id_tc_list por respuesta) -----
+
+library(dplyr)
+library(stringr)
+library(readr)
+library(tidyr)
+library(writexl)
+
+
+
+# 0. id_tc_all (salones de la muestra)
+id_tc_all <- unique(c(id_tc_control, id_tc_tratamiento))
+
+## Dummy 'docente_muestra' (1 si al menos un ID_TC del id_tc_list está en la muestra) ----
+
+library(stringr)
+
+# 0) Asegurar id_tc_all
+if (!exists("id_tc_all")) id_tc_all <- unique(c(id_tc_control, id_tc_tratamiento))
+
+# 1) Comprobar que id_tc_list exista
+if (!"id_tc_list" %in% names(alertas)) {
+  stop("No existe 'id_tc_list' en 'alertas'. Ejecutá primero el bloque que genera id_tc_list.")
+}
+
+# 2) Separar id_tc_list y chequear pertenencia a la muestra
+#    (maneja NA / cadenas vacías correctamente)
+lista_componentes <- str_split(ifelse(is.na(alertas$id_tc_list), "", alertas$id_tc_list), ";\\s*")
+
+# 3) Vector lógico: TRUE si ANY(v %in% id_tc_all)
+in_muestra_vec <- vapply(lista_componentes, function(v) {
+  if (length(v) == 0) return(FALSE)
+  v <- v[v != ""]
+  if (length(v) == 0) return(FALSE)
+  any(v %in% id_tc_all)
+}, logical(1))
+
+# 4) Crear la dummy en alertas (1/0)
+alertas <- alertas %>%
+  mutate(docente_muestra = as.integer(in_muestra_vec))
+
+# 5) Diagnóstico breve
+message("docente_muestra creado en 'alertas'.")
+message(paste0("Filas totales en 'alertas': ", nrow(alertas)))
+message(paste0("Filas con docente_muestra == 1: ", sum(alertas$docente_muestra == 1, na.rm = TRUE)))
+message(paste0("Filas con docente_muestra == 0: ", sum(alertas$docente_muestra == 0, na.rm = TRUE)))
+
+
+# 11) Rechazos y totales para Looker ------------------------------------------
 if (!"consentimiento" %in% names(alertas)) alertas$consentimiento <- NA
 
 alertas <- alertas %>%
