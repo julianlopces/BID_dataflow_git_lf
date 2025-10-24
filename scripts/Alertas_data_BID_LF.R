@@ -687,7 +687,8 @@ seguimiento_colegios <- alertas_sin_duplicados %>%
     exitos = sum(Exitos, na.rm = TRUE),
     tratamiento = first(tratamiento),
     l_base = sum(as.numeric(lb_pull),na.rm = TRUE),
-    exitos_lb = sum(if_else(Exitos == 1 & lb_pull == 1,1,0), na.rm = TRUE)
+    exitos_lb = sum(if_else(Exitos == 1 & lb_pull == 1,1,0), na.rm = TRUE),
+    alertas_lb = sum(if_else(Alertas == 1 & lb_pull == 1,1,0), na.rm = TRUE)
   )%>%
   filter(!is.na(colegio_final))
 
@@ -705,7 +706,7 @@ seguimiento_colegios_2 <- lbase %>%
   mutate(tratamiento = if_else(COD_COLEGIO %in% colegios_tratamiento,
                                "Tramiento","Control"),
          avance_total = (exitos/TOTAL) * 100,
-         avance_lb = (exitos_lb/TOTAL_LB) * 100 )
+         avance_lb = ((exitos_lb + alertas_lb)/TOTAL_LB) * 100)
   
 # Confirmación de finalización
 message("Alertas creadas exitosamente.")

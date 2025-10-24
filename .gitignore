@@ -50,3 +50,4 @@ build/
 .Rproj.user
 .httr-oauth
 .quarto
+*.gsheet
