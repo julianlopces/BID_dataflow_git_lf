@@ -1,7 +1,6 @@
 # docentes_lf/scripts/2_auditoria.R
-# --------------------------------------------------------------
-# Auditoría Docentes LF
-# --------------------------------------------------------------
+
+# Auditoría Docentes LF / María José Mesías Sevilla
 
 message("==> Auditoría Docentes LF iniciada")
 
@@ -273,7 +272,7 @@ if (!"prueba_2" %in% names(alertas)) alertas$prueba_2 <- NA
 alertas <- alertas %>%
   mutate(flag_prueba2 = if_else(!is.na(prueba_2) & suppressWarnings(as.numeric(prueba_2)) != 4, 1L, 0L, missing = 0L))
 
-# -- FLAG_LB: solo 2 valores -------------------------
+# -- FLAG_LB: solo 2 valores 
 for (v in c("filtro_lb","teacher_fullname2")) if (!v %in% names(alertas)) alertas[[v]] <- NA
 
 alertas <- alertas %>%
