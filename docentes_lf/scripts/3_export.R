@@ -1,9 +1,5 @@
 # docentes_lf/scripts/3_export.R
 # --------------------------------------------------------------
-# Export Docentes LF -> Google Sheets (Looker)
-# Requiere objetos:
-# --------------------------------------------------------------
-
 message("==> Export Docentes LF iniciado")
 
 # Fallbacks por si en el master usaste otros nombres:
@@ -11,57 +7,58 @@ if (!exists("temp_creds_file") && exists("creds_json")) temp_creds_file <- creds
 if (!exists("id_alertas")      && exists("sheet_id"))    id_alertas    <- sheet_id
 
 # Validaciones
-if (!exists("temp_creds_file") || !nzchar(temp_creds_file) || !file.exists(temp_creds_file)) {
-  stop("No se encontraron las credenciales de Google Sheets (temp_creds_file). Cárgalas en el master.")
-}
-if (!exists("id_alertas") || !nzchar(id_alertas)) {
-  stop("No se encontró el ID del Google Sheet (id_alertas). Cárgalo en el master.")
-}
 if (!exists("alertas")) stop("No existe 'alertas'. Corre 2_auditoria.R antes del export.")
 if (!exists("data"))    stop("No existe 'data'. Corre 1_import.R antes del export.")
+if (!exists("salones_docentes")) stop("No existe 'salones_docentes'. Corre 2_auditoria.R antes del export.")
+if (!nzchar(id_alertas)) stop("id_alertas vacío.")
+if (!file.exists(temp_creds_file)) stop("No existe temp_creds_file: ", temp_creds_file)
 
-if (!is.data.frame(alertas)) {
-  stop("`alertas` no es un data.frame/tibble. Corre 2_auditoria.R en esta sesión antes del export.")
-}
-
-# Autenticación 
+# --- Auth + logs ---
 suppressMessages({
   googledrive::drive_auth(path = temp_creds_file, cache = ".secrets")
   googlesheets4::gs4_auth(path = temp_creds_file)
 })
+message(sprintf("🔐 Cred file: %s (exists=%s)", temp_creds_file, file.exists(temp_creds_file)))
 
-# Abrir el spreadsheet
-sheet <- tryCatch({
-  googlesheets4::gs4_get(id_alertas)
-}, error = function(e) {
-  stop("Error al conectar con el Google Sheet de alertas: ", conditionMessage(e))
-})
+u <- tryCatch(googlesheets4::gs4_user(), error = function(e) NULL)
+if (is.null(u)) {
+  message("👤 gs4_user: <desautenticado>")
+} else if (is.list(u)) {
+  em <- tryCatch(as.character(u$email), silent = TRUE); if (inherits(em, "try-error")) em <- NA_character_
+  dn <- tryCatch(as.character(u$display_name), silent = TRUE); if (inherits(dn, "try-error")) dn <- NA_character_
+  message("👤 gs4_user: ", if (!is.na(em)) em else "<sin-email>",
+          if (!is.na(dn)) paste0(" (", dn, ")") else "")
+} else {
+  # cuando gs4_user() devuelve un vector atómico (p.ej. solo el email)
+  message("👤 gs4_user: ", as.character(u))
+}
 
-# Helper genérico
+
+# Helper export
 export_sheet <- function(df, ss, sheet_name, label = sheet_name, pause = 0) {
-  message(sprintf("Exportando %s...", label))
+  message(sprintf("⬆️  Exportando %s → pestaña '%s'...", label, sheet_name))
   tryCatch({
     googlesheets4::sheet_write(df, ss = ss, sheet = sheet_name)
-    message(sprintf("Datos de %s exportados correctamente.", label))
   }, error = function(e) {
     stop(sprintf("Error al exportar %s: %s", label, conditionMessage(e)))
   })
   if (pause > 0) Sys.sleep(pause)
+  ok <- tryCatch({
+    xr <- googlesheets4::range_read(ss, sheet = sheet_name, range = "A1:B2", col_types = "c")
+    nrow(xr) >= 1
+  }, error = function(e) FALSE)
+  message(sprintf("✅ Verificación %s: %s", sheet_name, if (ok) "OK" else "FALLÓ (no se pudo leer)"))
+  if (pause > 0) Sys.sleep(pause)
 }
 
-# ---- Tablas a exportar ----
-# Nombres de pestañas (ajústalos si quieres)
+# Pestañas
 TAB_ALERTAS <- "alertas_docentes"
 TAB_RAW     <- "data_docentes_raw"
 TAB_RESUMEN <- "resumen_docentes"
+TAB_SALONES <- "salones_docentes"
 
-# Resumen KPIs (coje banderas si existen; si no, 0)
-`%||%` <- function(x, y) if (is.null(x)) y else x
-
-val_sum <- function(df, col) {
-  if (is.data.frame(df) && col %in% names(df)) sum(df[[col]], na.rm = TRUE) else NA_integer_
-}
-
+# Resumen KPIs
+val_sum <- function(df, col) if (is.data.frame(df) && col %in% names(df)) sum(df[[col]], na.rm = TRUE) else NA_integer_
 resumen_doc <- tibble::tibble(
   fecha_export   = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
   n_encuestas    = nrow(alertas),
@@ -76,10 +73,10 @@ resumen_doc <- tibble::tibble(
   exceso_ns      = val_sum(alertas, "flag_ns")
 )
 
-# ---- Exportar ----
-export_sheet(alertas,     sheet, TAB_ALERTAS, label = "alertas docentes", pause = 3)
-export_sheet(data,        sheet, TAB_RAW,     label = "datos crudos",     pause = 3)
-export_sheet(resumen_doc, sheet, TAB_RESUMEN, label = "resumen",          pause = 2)
+# Export
+export_sheet(alertas,          sheet, TAB_ALERTAS, label = "alertas docentes",   pause = 1)
+export_sheet(data,             sheet, TAB_RAW,     label = "datos crudos",       pause = 1)
+export_sheet(resumen_doc,      sheet, TAB_RESUMEN, label = "resumen",            pause = 1)
+export_sheet(salones_docentes, sheet, TAB_SALONES, label = "salones_docentes",   pause = 1)
 
 message("✅ Export Docentes LF finalizado.")
-
