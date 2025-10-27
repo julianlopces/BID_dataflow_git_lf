@@ -707,6 +707,48 @@ seguimiento_colegios_2 <- lbase %>%
                                "Tramiento","Control"),
          avance_total = (exitos/TOTAL) * 100,
          avance_lb = ((exitos_lb + alertas_lb)/TOTAL_LB) * 100)
+
+
+# Creación variables intervención
+
+preguntas_aldea <- c(paste0("aldea_",c(1:10)))
+historias  <- c("Tipico","Todos_ganan","Esteban","Palabrotas","Ondas",
+                "Golpe","Quien_crees","Volcan","Adivinos","Prueba")
+
+for (i in seq_along(preguntas_aldea)) {
+  var_aldea <- preguntas_aldea[i]
+  historia_var <- paste0(historias[i],"_lectura_modo")
+  historia_leida_var <- paste0(historias[i],"_lectura_dummy")
+
+  
+  alertas <- alertas %>%
+    mutate(
+      !!historia_var := case_when(.data[[var_aldea]] == 1 ~ "En clase",
+                                  .data[[var_aldea]] == 2 ~ "En casa",
+                                  .data[[var_aldea]] == 3 ~ "En clase y en casa",
+                                  .data[[var_aldea]] == 4 ~ "No la leyo",
+                                  .data[[var_aldea]] == 99 ~ "No recuerda",
+                                  TRUE ~ NA_character_))
+  alertas <- alertas %>%
+    mutate(
+      !!historia_leida_var := case_when(.data[[var_aldea]] %in% c(1,3) ~ 1,
+                                        .data[[var_aldea]] %in% c(2,3,4,99) ~ 0,
+                                        TRUE ~ NA_integer_)
+      
+    )
+}
+
+
+# Sumar total historias leidas
+
+variables_lectura_dummy <- names(alertas %>%
+                             select(contains("_lectura_dummy")))
+
+alertas <- alertas %>%
+  mutate(
+    total_historias_leidas = if_else(trat_final == 1, rowSums(alertas[,variables_lectura_dummy], na.rm = T),NA))
+
+
   
 # Confirmación de finalización
 message("Alertas creadas exitosamente.")
