@@ -231,14 +231,23 @@ if ("teacher_experience" %in% names(alertas)) {
   alertas$ex_experience_vs_age <- NA_integer_
 }
 
-# 4.d) Flag global de extremos -----------------------------------------------
+# 4.d) Flag global de extremos (sin NA) ----------------
 alertas <- alertas %>%
-  mutate(flag_extreme_values = as.integer(
-    (if ("ex_edad" %in% names(.)) ex_edad==1 else FALSE) |
-      (if ("ex_horas_impl" %in% names(.)) ex_horas_impl==1 else FALSE) |
-      (if ("ex_experience_z" %in% names(.)) ex_experience_z==1 else FALSE) |
-      (if ("ex_experience_vs_age" %in% names(.)) ex_experience_vs_age==1 else FALSE)
-  ))
+  mutate(
+    ex_edad              = if (!"ex_edad" %in% names(.)) NA_integer_ else ex_edad,
+    ex_horas_impl        = if (!"ex_horas_impl" %in% names(.)) NA_integer_ else ex_horas_impl,
+    ex_experience_z      = if (!"ex_experience_z" %in% names(.)) NA_integer_ else ex_experience_z,
+    ex_experience_vs_age = if (!"ex_experience_vs_age" %in% names(.)) NA_integer_ else ex_experience_vs_age
+  ) %>%
+  mutate(
+    flag_extreme_values = as.integer(
+      dplyr::coalesce(ex_edad, 0L) == 1L |
+        dplyr::coalesce(ex_horas_impl, 0L) == 1L |
+        dplyr::coalesce(ex_experience_z, 0L) == 1L |
+        dplyr::coalesce(ex_experience_vs_age, 0L) == 1L
+    )
+  )
+
 
 # 5) Duplicados con id_docentes_lf --------------------------------------------
 if (!"id_docentes_lf" %in% names(alertas)) {
@@ -264,20 +273,25 @@ if (!"prueba_2" %in% names(alertas)) alertas$prueba_2 <- NA
 alertas <- alertas %>%
   mutate(flag_prueba2 = if_else(!is.na(prueba_2) & suppressWarnings(as.numeric(prueba_2)) != 4, 1L, 0L, missing = 0L))
 
-# b) 'flag_lb' categórica robusta --------------------------------------------
+# -- FLAG_LB: solo 2 valores -------------------------
 for (v in c("filtro_lb","teacher_fullname2")) if (!v %in% names(alertas)) alertas[[v]] <- NA
+
 alertas <- alertas %>%
   mutate(
     filtro_lb_num = suppressWarnings(as.numeric(trimws(as.character(filtro_lb)))),
     tf2_raw       = trimws(as.character(teacher_fullname2)),
-    tf2_num       = suppressWarnings(as.numeric(tf2_raw)),
+    tf2_is_99     = suppressWarnings(as.numeric(tf2_raw) == 99),
+    tf2_is_blank  = is.na(tf2_raw) | tf2_raw == "",
     flag_lb = dplyr::case_when(
-      filtro_lb_num == 1 & !is.na(tf2_num) & tf2_num != 99 ~ "con línea de base",
-      filtro_lb_num == 1 & (!is.na(tf2_num) & tf2_num == 99 | is.na(tf2_num) | tf2_raw=="") ~ "con línea de base pero no marcó nombre",
-      filtro_lb_num == 2 ~ "sin línea de base",
+      # Con LB: filtro==1 y teacher_fullname2 no vacío y != 99
+      filtro_lb_num == 1 & !tf2_is_blank & !tf2_is_99 ~ "Con línea de base",
+      # Sin LB: filtro==2  OR (filtro==1 y teacher_fullname2==99)
+      filtro_lb_num == 2 | (filtro_lb_num == 1 & tf2_is_99) ~ "Sin Línea de base",
       TRUE ~ NA_character_
     )
-  ) %>% select(-filtro_lb_num, -tf2_raw, -tf2_num)
+  ) %>%
+  select(-filtro_lb_num, -tf2_raw, -tf2_is_99, -tf2_is_blank)
+
 
 # c) 'flag_prueba50' -> se activa si hay cualquier valor (debería estar vacía)
 if (!"prueba_50" %in% names(alertas)) alertas$prueba_50 <- NA
@@ -556,38 +570,46 @@ salones_docentes <- base_long %>%
   dplyr::select(salon, colegio, flag_muestra, n_docentes, n_docentes_muestra,
                 n_conoce_programa, flag_horas, tratamiento)
 
+# Helper para normalizar flags a 0/1 (sin NA)
+flag0 <- function(x) {
+  y <- suppressWarnings(as.integer(x))
+  y[is.na(y)] <- 0L
+  y
+}
+
 # 11) Rechazos y totales para Looker ------------------------------------------
 if (!"consentimiento" %in% names(alertas)) alertas$consentimiento <- NA
 
 alertas <- alertas %>%
-  dplyr::mutate(
-    flag_rejected   = dplyr::if_else(suppressWarnings(as.numeric(consentimiento)) == 2, 1L, 0L),
-    flag_duplicated = dplyr::if_else(duplicado == 1, 1L, 0L),
-    flag_missing    = dplyr::if_else(!is.na(total_missing) & total_missing > 0, 1L, 0L),
-    total_encuestas = dplyr::n()
+  mutate(
+    flag_rejected       = flag0(suppressWarnings(as.numeric(consentimiento) == 2)),
+    flag_duplicated     = flag0(duplicado == 1),
+    flag_missing        = flag0(!is.na(total_missing) & total_missing > 0),
+    flag_extreme_values = flag0(flag_extreme_values),             # del paso 4.d corregido
+    flag_duration_mas   = flag0(flag_duration_mas),
+    flag_duration_menos = flag0(flag_duration_menos),
+    flag_prueba2        = flag0(suppressWarnings(as.numeric(prueba_2)) != 4),
+    flag_prueba50       = flag0(!(is.na(prueba_50) | trimws(as.character(prueba_50))=="")),
+    flag_ns             = if ("flag_ns" %in% names(.)) flag0(flag_ns) else 0L
   ) %>%
-  dplyr::mutate(
-    Exitos  = dplyr::if_else(flag_duration_mas==0 & flag_duration_menos==0 &
-                               flag_duplicated==0 & flag_missing==0 &
-                               flag_extreme_values==0 &
-                               (if ("flag_ns" %in% names(.)) flag_ns==0 else TRUE) &
-                               flag_rejected==0 &
-                               flag_prueba2==0 &
-                               (if ("flag_prueba50" %in% names(.)) flag_prueba50==0 else TRUE), 1L, 0L),
-    Alertas = dplyr::if_else(flag_duration_mas==1 | flag_duration_menos==1 |
-                               flag_duplicated==1 | flag_missing==1 |
-                               (if ("flag_ns" %in% names(.)) flag_ns==1 else FALSE) |
-                               flag_extreme_values==1 |
-                               flag_prueba2==1 |
-                               (if ("flag_prueba50" %in% names(.)) flag_prueba50==1 else FALSE), 1L, 0L),
-    Rechazos = dplyr::if_else(flag_rejected==1, 1L, 0L),
-    tiempos_anomalos_mas   = dplyr::if_else(flag_duration_mas==1, "Sí", "No"),
-    tiempos_anomalos_menos = dplyr::if_else(flag_duration_menos==1, "Sí", "No"),
-    duplicado_lbl          = dplyr::if_else(flag_duplicated==1, "Sí", "No"),
-    valores_faltantes      = dplyr::if_else(flag_missing==1, "Sí", "No"),
-    valores_extremos       = dplyr::if_else(flag_extreme_values==1, "Sí", "No"),
-    exceso_ns              = if ("flag_ns" %in% names(.)) dplyr::if_else(flag_ns==1,"Sí","No") else NA_character_
-  )
+  # Suma de flags "malas" → 0 = Exitos, >0 = Alertas
+  mutate(
+    bad_flags_sum =
+      flag_duration_mas + flag_duration_menos +
+      flag_duplicated   + flag_missing        +
+      flag_extreme_values + flag_ns +
+      flag_rejected     + flag_prueba2 + flag_prueba50,
+    Exitos  = as.integer(bad_flags_sum == 0L),
+    Alertas = as.integer(bad_flags_sum >  0L),
+    Rechazos = flag_rejected,
+    tiempos_anomalos_mas   = if_else(flag_duration_mas==1L, "Sí", "No"),
+    tiempos_anomalos_menos = if_else(flag_duration_menos==1L, "Sí", "No"),
+    duplicado_lbl          = if_else(flag_duplicated==1L, "Sí", "No"),
+    valores_faltantes      = if_else(flag_missing==1L, "Sí", "No"),
+    valores_extremos       = if_else(flag_extreme_values==1L, "Sí", "No"),
+    exceso_ns              = if ("flag_ns" %in% names(.)) if_else(flag_ns==1L,"Sí","No") else NA_character_
+  ) %>%
+  select(-bad_flags_sum)
 
 # 9) Orden de columnas --------------------------------------------------------
 alertas <- tibble::as_tibble(alertas)
@@ -614,6 +636,15 @@ resumen_looker <- alertas %>%
   ) %>%
   dplyr::mutate(fecha_export = format(Sys.time(), "%Y-%m-%d %H:%M")) %>%
   dplyr::select(fecha_export, dplyr::everything())
+
+
+message("── QA rápido ──")
+try(print(table(alertas$flag_lb, useNA="ifany")), silent = TRUE)
+try(print(colSums(select(alertas,
+                         Exitos, Alertas, Rechazos,
+                         flag_duration_mas, flag_duration_menos, flag_duplicated, flag_missing,
+                         flag_extreme_values, flag_ns, flag_prueba2, flag_prueba50
+), na.rm = TRUE)), silent = TRUE)
 
 
 # 10) Guardar -----------------------------------------------------------------
