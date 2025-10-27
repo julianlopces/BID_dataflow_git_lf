@@ -749,6 +749,57 @@ alertas <- alertas %>%
     total_historias_leidas = if_else(trat_final == 1, rowSums(alertas[,variables_lectura_dummy], na.rm = T),NA))
 
 
+# Preguntas ejercicios
+
+preguntas_ejercicios <- c(paste0("aldea_preguntas_add_",c(seq(1,19,by=2))))
+preguntas_ranas <- c(paste0("aldea_preguntas_add_",c(seq(2,20,by=2))))
+
+nombre_historias <- c("Tipico","Golpe","Quien_crees","Volcan","Adivinos",
+                      "Palabrotas","Todos_ganan","Ondas","Prueba","Esteban"
+                      )
+
+
+for (i in seq_along(preguntas_ejercicios)) {
+  var_ejercicios <- preguntas_ejercicios[i]
+  var_ranas <- preguntas_ranas[i]
+  historia <- nombre_historias[i]
+  dummy_ejercicios <- paste0(historia,"_cartilla_dummy")
+  dummy_ranas <- paste0(historia,"_ranas_dummy")
+  
+  
+  alertas <- alertas %>%
+    mutate(
+      !!dummy_ejercicios := case_when(.data[[var_ejercicios]] == 1 ~ 1,
+                                  .data[[var_ejercicios]] %in% c(2,99) ~ 0,
+                                  TRUE ~ NA_integer_))
+  alertas <- alertas %>%
+    mutate(
+      !!dummy_ranas := case_when(.data[[var_ranas]] == 1 ~ 1,
+                                        .data[[var_ranas]] %in% c(2,99) ~ 0,
+                                        TRUE ~ NA_integer_)
+      
+    )
+}
+
+
+# Preguntas juegos
+
+
+alertas <- alertas %>%
+  mutate(
+    across(paste0("aldea_juegos_", c(1:6, 99)),
+           ~ as.numeric(.x)),
+    across(
+      paste0("aldea_juegos_", c(1:6, 99)),
+      ~ dplyr::case_when(
+        is.na(.x) & trat_final == 1 ~ 0L,           
+        is.na(.x) & trat_final == 0 ~ NA_integer_, 
+        TRUE                     ~ .x
+      )
+    )
+  )
+
+
   
 # Confirmación de finalización
 message("Alertas creadas exitosamente.")
