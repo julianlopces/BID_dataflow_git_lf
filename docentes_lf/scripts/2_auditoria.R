@@ -526,13 +526,18 @@ colegio_por_salon <- if (nrow(alertas_long_in)) {
     dplyr::summarise(colegio = dplyr::first(teacher_school_label), .groups = "drop")
 } else tibble::tibble(ID_TC = character(), colegio = character())
 
-# Resolver alias para knows/hours
+# Resolver alias para knows/hours + flag_knows (1 si == 2; en otro caso 0)
 knows_col <- intersect(c("teacher_knows_program", "teacher_knows_programa", "knows_program"), names(alertas))
 hours_col <- intersect(c("horas_implementacion_programa", "hour_implementacion_programa", "horas_programa"), names(alertas))
 
 alertas <- alertas %>%
   dplyr::mutate(
-    knows_tmp = if (length(knows_col)) as.character(.data[[knows_col[1]]]) else NA_character_,
+    # numérico limpio de "knows"
+    knows_num = if (length(knows_col)) suppressWarnings(as.numeric(.data[[knows_col[1]]])) else NA_real_,
+    # flag: dispara alerta cuando el valor es 2
+    flag_knows = dplyr::coalesce(as.integer(knows_num == 2), 0L),
+    # dejamos estos auxiliares para salones_docentes como los usabas
+    knows_tmp = as.character(knows_num),
     hours_tmp = if (length(hours_col))  suppressWarnings(as.numeric(.data[[hours_col[1]]])) else NA_real_
   )
 
@@ -589,7 +594,8 @@ alertas <- alertas %>%
     flag_duration_menos = flag0(flag_duration_menos),
     flag_prueba2        = flag0(suppressWarnings(as.numeric(prueba_2)) != 4),
     flag_prueba50       = flag0(!(is.na(prueba_50) | trimws(as.character(prueba_50))=="")),
-    flag_ns             = if ("flag_ns" %in% names(.)) flag0(flag_ns) else 0L
+    flag_ns             = if ("flag_ns" %in% names(.)) flag0(flag_ns) else 0L,
+    flag_knows          = dplyr::coalesce(as.integer(knows_num == 2), 0L)
   ) %>%
   # Suma de flags "malas" → 0 = Exitos, >0 = Alertas
   mutate(
@@ -597,7 +603,8 @@ alertas <- alertas %>%
       flag_duration_mas + flag_duration_menos +
       flag_duplicated   + flag_missing        +
       flag_extreme_values + flag_ns +
-      flag_rejected     + flag_prueba2 + flag_prueba50,
+      flag_rejected     + flag_prueba2 + flag_prueba50 +
+      flag_knows,
     Exitos  = as.integer(bad_flags_sum == 0L),
     Alertas = as.integer(bad_flags_sum >  0L),
     Rechazos = flag_rejected,
@@ -642,7 +649,7 @@ try(print(table(alertas$flag_lb, useNA="ifany")), silent = TRUE)
 try(print(colSums(select(alertas,
                          Exitos, Alertas, Rechazos,
                          flag_duration_mas, flag_duration_menos, flag_duplicated, flag_missing,
-                         flag_extreme_values, flag_ns, flag_prueba2, flag_prueba50
+                         flag_extreme_values, flag_ns, flag_prueba2, flag_prueba50, flag_knows
 ), na.rm = TRUE)), silent = TRUE)
 
 
