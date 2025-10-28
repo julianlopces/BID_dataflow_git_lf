@@ -70,11 +70,19 @@ reporte_nose_clean <- reporte_nose %>%
 
 
 
+# Helper genérico para exportar a Google Sheets con manejo de errores y pausa opcional
+export_sheet <- function(df, ss, sheet_name, label = sheet_name, pause = 0) {
+  message(sprintf("Exportando %s...", label))
+  tryCatch({
+    sheet_write(df, ss = ss, sheet = sheet_name)
+    message(sprintf("Datos de %s exportados correctamente.", label))
+  }, error = function(e) {
+    stop(sprintf("Error al exportar %s: %s", label, conditionMessage(e)))
+  })
+  if (pause > 0) Sys.sleep(pause)
+}
 
 
-
-
-
-
+export_sheet(reporte_nose_clean,sheet, "reporte_ns_nr", label = "alertas", pause = 5)
 
 
