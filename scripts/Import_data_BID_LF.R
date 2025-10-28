@@ -226,6 +226,17 @@ data <- data %>%
     colegio_pull_id = if_else(colegio_pull_id == "111001e11", "111001025020", colegio_pull_id)
   )
 
+data <- data %>%
+  mutate(
+    colegio_str = if_else(codigo_compuesto == "111001e11_111001e13_502_TARDE",
+                          "COLEGIO ALBERTO LLERAS CAMARGO (IED)",colegio_str),
+    sede_str = if_else(codigo_compuesto == "111001e11_111001e13_502_TARDE",
+                          "ALBERTO LLERAS CAMARGO",sede_str),
+    codigo_compuesto = if_else(codigo_compuesto == "111001e11_111001e13_502_TARDE",
+                       "111001025020_11100102502001_502_TARDE",codigo_compuesto)
+    
+  )
+
 # Ajustar Linea de base
 
 
