@@ -30,4 +30,33 @@ export_sheet(alertas_encuestadores, sheet, "alertas_encuestadores",label = "encu
 export_sheet(seguimiento_colegios_2, sheet, "seguimiento_colegios", label = "colegios",         pause = 5)
 
 
+# Crear y exportar listado de seguimiento Diego
+
+alertas_diego <- alertas_sin_duplicados %>%
+  transmute(
+    Encuestador = username,
+    ID = student_id,
+    Nombre = nombre,
+    Codigo_colegio = coalesce(school_final,student_school_reject, student_school, colegio_pull_id),
+    Estado = if_else(assent == 1, "Aceptó encuesta","Rechazo encuesta"),
+    Motivo_rechazo = rechazo_str,
+    ID_uuid = student_id_uuid
+  )
+
+
+alertas_diego <- alertas_diego %>%
+  left_join(lbase %>% select(COD_COLEGIO,COLEGIO),
+            by = c("Codigo_colegio"="COD_COLEGIO"))%>%
+  relocate(COLEGIO,.before = ID)
+
+sheet2 <- tryCatch({
+  gs4_get("1rwGebhR5HBNukMgRCHMQ6w2j9silfhNLPVAN0xUNQy8")
+}, error = function(e) {
+  stop("Error al conectar con el Google Sheet de alertas: ", e)
+})
+
+
+export_sheet(alertas_diego, sheet2, "estudiantes", label = "colegios",pause = 5)
+
+
 message("✅ Todos los datos fueron exportados exitosamente.")
