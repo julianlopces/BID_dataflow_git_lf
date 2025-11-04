@@ -237,6 +237,24 @@ data <- data %>%
     
   )
 
+# Ajustar estudiantes con id
+
+ID_sin_lista <- read_sheet(id_alertas,
+                           sheet = "id_sin_lista")
+
+data <- data %>%
+  left_join(ID_sin_lista%>%select(KEY,ID_CORR = ID_4,NOMBRE_CORR = nombre,LB_CORR = LB), by = "KEY")%>%
+  mutate(
+    student_id = if_else(!is.na(ID_CORR),ID_CORR,student_id),
+    student_id_final = if_else(!is.na(ID_CORR),ID_CORR,student_id),
+    name_final = if_else(!is.na(NOMBRE_CORR),NOMBRE_CORR,name_final),
+    lb_pull = if_else(!is.na(LB_CORR),as.character(LB_CORR),lb_pull),
+    student_id_yesno = if_else(!is.na(student_id),"1",student_id_yesno)
+  )%>%
+  select(-c(ID_CORR,NOMBRE_CORR,LB_CORR))
+
+
+
 # Ajustar Linea de base
 
 
