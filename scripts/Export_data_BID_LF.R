@@ -58,5 +58,6 @@ sheet2 <- tryCatch({
 
 export_sheet(alertas_diego, sheet2, "estudiantes", label = "colegios",pause = 5)
 export_sheet(seguimiento_colegios_detalle_final, sheet2, "seguimiento_colegios", label = "colegios",pause = 5)
+export_sheet(lista_estudiantes_pendiente, sheet2, "estudiantes_faltantes", label = "estudiantes faltantes",pause = 5)
 
 message("✅ Todos los datos fueron exportados exitosamente.")
