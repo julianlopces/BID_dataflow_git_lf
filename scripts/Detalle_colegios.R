@@ -82,4 +82,14 @@ seguimiento_colegios_detalle_final <- seguimiento_colegios_detalle %>%
   arrange(desc(estado_conocido))
 
 
+# Colegios priorizados
+
+colegios_priorizados <- seguimiento_colegios_detalle_final %>%
+  select(COD_COLEGIO,COLEGIO,avance_lb,Ausentes,Ausentes_lb,pendientes,pendientes_lb)%>%
+  group_by(COD_COLEGIO,COLEGIO)%>%
+  mutate(total_faltantes = sum(Ausentes,Ausentes_lb,pendientes,pendientes_lb,na.rm = TRUE))%>%
+  filter((Ausentes >= 3 | Ausentes_lb >= 3 | pendientes >= 3 | pendientes_lb >= 3) & avance_lb > 0)%>%
+  arrange(desc(total_faltantes))
+
+
 
