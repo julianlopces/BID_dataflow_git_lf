@@ -84,6 +84,7 @@ load_script <- function(script_name) {
 # Ejecutar scripts secundarios en orden
 load_script("Import_data_BID_LF.R")
 load_script("Alertas_data_BID_LF.R")
+load_script("Detalle_colegios.R")
 load_script("Export_data_BID_LF.R")
 
 message("Pipeline completado exitosamente.")

@@ -40,12 +40,6 @@ seguimiento_colegios_lb <- alertas_sin_duplicados %>%
 
 # Agregar meta de lb
 
-lbase <- read_sheet(id_alertas,
-                    sheet = "meta_lb")
-
-lbase$COD_COLEGIO <- as.character(lbase$COD_COLEGIO)
-
-
 seguimiento_colegios_detalle <- lbase %>%
   full_join(seguimiento_colegios_lb, by = c("COD_COLEGIO" = "school_final"))%>%
   mutate(tratamiento = if_else(COD_COLEGIO %in% colegios_tratamiento,
@@ -59,6 +53,8 @@ seguimiento_colegios_detalle <- lbase %>%
 # Estado desconocido 
 
 
+lista_estudiantes  <- read_sheet(id_alertas,
+                    sheet = "bid_listado")
 
 lista_estudiantes_pendiente <- lista_estudiantes %>%
   filter(!ID %in% c(1:25) & !ID %in% alertas_sin_duplicados$student_id_final)
@@ -71,8 +67,6 @@ pendiente_estudiantes_colegios <- lista_estudiantes_pendiente %>%
             pendientes_lb = sum(LB == 1, na.rm = TRUE))%>%
   arrange(desc(pendientes_lb))%>%
   mutate(COD_COLEGIO = as.character(COD_COLEGIO))
-
-
 
 
 
