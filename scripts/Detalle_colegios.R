@@ -77,7 +77,8 @@ pendiente_estudiantes_colegios <- lista_estudiantes_pendiente %>%
 
 seguimiento_colegios_detalle_final <- seguimiento_colegios_detalle %>%
   left_join(pendiente_estudiantes_colegios, by = "COD_COLEGIO")%>%
-  mutate(estado_conocido = (l_base/TOTAL_LB)*100)%>%
+  mutate(estado_conocido = (l_base/TOTAL_LB)*100,
+         estado_conocido = if_else(estado_conocido > 100,100,estado_conocido))%>%
   arrange(desc(estado_conocido))
 
 
