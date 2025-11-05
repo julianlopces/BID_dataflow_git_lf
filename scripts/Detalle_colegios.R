@@ -54,10 +54,11 @@ seguimiento_colegios_detalle <- lbase %>%
 
 
 lista_estudiantes  <- read_sheet(id_alertas,
-                    sheet = "bid_listado")
+                    sheet = "bid_listado")%>%
+  filter(!ID %in% ID_lbase_corregido$ID)
 
 lista_estudiantes_pendiente <- lista_estudiantes %>%
-  filter(!ID %in% c(1:25) & !ID %in% alertas_sin_duplicados$student_id_final)
+  filter(!ID %in% alertas_sin_duplicados$student_id_final)
 
 
 
