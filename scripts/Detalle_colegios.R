@@ -56,3 +56,33 @@ seguimiento_colegios_detalle <- lbase %>%
 
 
 
+# Estado desconocido 
+
+
+
+lista_estudiantes_pendiente <- lista_estudiantes %>%
+  filter(!ID %in% c(1:25) & !ID %in% alertas_sin_duplicados$student_id_final)
+
+
+
+pendiente_estudiantes_colegios <- lista_estudiantes_pendiente %>%
+  group_by(COD_COLEGIO)%>%
+  summarise(pendientes = sum(LB == 0, na.rm = TRUE),
+            pendientes_lb = sum(LB == 1, na.rm = TRUE))%>%
+  arrange(desc(pendientes_lb))%>%
+  mutate(COD_COLEGIO = as.character(COD_COLEGIO))
+
+
+
+
+
+# Añadir pendientes
+
+
+seguimiento_colegios_detalle_final <- seguimiento_colegios_detalle %>%
+  left_join(pendiente_estudiantes_colegios, by = "COD_COLEGIO")%>%
+  mutate(estado_conocido = (l_base/TOTAL_LB)*100)%>%
+  arrange(desc(estado_conocido))
+
+
+
