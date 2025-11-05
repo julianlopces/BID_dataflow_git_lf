@@ -271,7 +271,8 @@ data <- data %>%
 
 data <- data %>%
   left_join(ID_lbase_corregido %>% select(ID,ID_4), by = c("student_id" = "ID"))%>%
-  mutate(student_id = if_else(!is.na(ID_4),ID_4,student_id))
+  mutate(student_id = if_else(!is.na(ID_4),ID_4,student_id),
+         student_id = if_else(!is.na(ID_4),ID_4,student_id))
 
 
 
