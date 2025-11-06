@@ -214,5 +214,74 @@ data <- data %>%
 data <- data %>%
   filter(!student_id %in% c(1:25))
 
+# Correcciones actualización tablets
+
+data <- data %>%
+  mutate(
+    # usar primero la condición con el valor original
+    school_final = if_else(colegio_pull_id == "111001e11", "111001025020", school_final),
+    sede_pull_id = if_else(colegio_pull_id == "111001e11", "11100102502001", sede_pull_id),
+    sede_final   = if_else(colegio_pull_id == "111001e11", "11100102502001", sede_final),
+    # y al final actualizar la propia llave
+    colegio_pull_id = if_else(colegio_pull_id == "111001e11", "111001025020", colegio_pull_id)
+  )
+
+data <- data %>%
+  mutate(
+    colegio_str = if_else(codigo_compuesto == "111001e11_111001e13_502_TARDE",
+                          "COLEGIO ALBERTO LLERAS CAMARGO (IED)",colegio_str),
+    sede_str = if_else(codigo_compuesto == "111001e11_111001e13_502_TARDE",
+                          "ALBERTO LLERAS CAMARGO",sede_str),
+    codigo_compuesto = if_else(codigo_compuesto == "111001e11_111001e13_502_TARDE",
+                       "111001025020_11100102502001_502_TARDE",codigo_compuesto)
+    
+  )
+
+# Ajustar estudiantes con id
+
+ID_sin_lista <- read_sheet(id_alertas,
+                           sheet = "id_sin_lista")
+
+data <- data %>%
+  left_join(ID_sin_lista%>%select(KEY,ID_CORR = ID_4,NOMBRE_CORR = nombre,LB_CORR = LB), by = "KEY")%>%
+  mutate(
+    student_id = if_else(!is.na(ID_CORR),ID_CORR,student_id),
+    student_id_final = if_else(!is.na(ID_CORR),ID_CORR,student_id),
+    name_final = if_else(!is.na(NOMBRE_CORR),NOMBRE_CORR,name_final),
+    lb_pull = if_else(!is.na(LB_CORR),as.character(LB_CORR),lb_pull),
+    student_id_yesno = if_else(!is.na(student_id),"1",student_id_yesno)
+  )%>%
+  select(-c(ID_CORR,NOMBRE_CORR,LB_CORR))
+
+
+
+# Ajustar Linea de base
+
+
+ID_lbase_corregido <- read_sheet(id_alertas,
+                                          sheet = "ID revisados")
+
+
+data <- data %>%
+  mutate(lb_pull = if_else(student_id %in% ID_lbase_corregido$ID_4, "1",lb_pull))
+
+
+# Corregir ID 
+
+
+data <- data %>%
+  left_join(ID_lbase_corregido %>% select(ID,ID_4), by = c("student_id" = "ID"))%>%
+  mutate(student_id = if_else(!is.na(ID_4),ID_4,student_id),
+         student_id = if_else(!is.na(ID_4),ID_4,student_id))
+
+
+
+# School_final_sede_final
+
+data <- data %>%
+  mutate(
+    school_final= if_else(is.na(school_final) & assent == 1, coalesce(colegio_corr,colegio_pull_id,student_school),school_final),
+    sede_final= if_else(is.na(sede_final) & assent == 1, coalesce(sede_corr,sede_pull_id,student_sede),sede_final)
+  )
 
 

@@ -41,3 +41,4 @@ build/
 .httr-oauth
 .quarto
 .secrets
+*.gsheet
