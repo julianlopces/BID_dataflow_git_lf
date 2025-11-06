@@ -18,6 +18,17 @@ suppressMessages({
   googledrive::drive_auth(path = temp_creds_file, cache = ".secrets")
   googlesheets4::gs4_auth(path = temp_creds_file)
 })
+# --- obtener el spreadsheet destino ---
+id_alertas <- trimws(if (exists("id_alertas")) id_alertas else "")
+if (!nzchar(id_alertas)) stop("id_alertas vacío.")
+
+sheet_ss <- tryCatch(
+  googlesheets4::gs4_get(id_alertas),
+  error = function(e) stop("No pude abrir id_alertas: ", conditionMessage(e))
+)
+message("📄 Destino: ", sheet_ss$spreadsheet_id)
+message("🔗 URL destino: ", sheet_ss$browser_url)
+
 message(sprintf("🔐 Cred file: %s (exists=%s)", temp_creds_file, file.exists(temp_creds_file)))
 
 u <- tryCatch(googlesheets4::gs4_user(), error = function(e) NULL)
@@ -74,9 +85,9 @@ resumen_doc <- tibble::tibble(
 )
 
 # Export
-export_sheet(alertas,          sheet, TAB_ALERTAS, label = "alertas docentes",   pause = 1)
-export_sheet(data,             sheet, TAB_RAW,     label = "datos crudos",       pause = 1)
-export_sheet(resumen_doc,      sheet, TAB_RESUMEN, label = "resumen",            pause = 1)
-export_sheet(salones_docentes, sheet, TAB_SALONES, label = "salones_docentes",   pause = 1)
+export_sheet(alertas,          sheet_ss, TAB_ALERTAS, label = "alertas docentes",   pause = 1)
+export_sheet(data,             sheet_ss, TAB_RAW,     label = "datos crudos",       pause = 1)
+export_sheet(resumen_doc,      sheet_ss, TAB_RESUMEN, label = "resumen",            pause = 1)
+export_sheet(salones_docentes, sheet_ss, TAB_SALONES, label = "salones_docentes",   pause = 1)
 
 message("✅ Export Docentes LF finalizado.")

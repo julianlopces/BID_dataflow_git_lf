@@ -2,21 +2,15 @@
 .Rhistory
 .RData
 .Rapp.history
-
-
 # Carpeta oculta de configuración personal de RStudio
 .Rproj.user/
-
 # Carpeta de secretos y tokens
 .secrets/
 looker/
 *.json
-
-
 # Archivos de entorno
 .env
 *.env
-
 # Archivos CSV, Excel, y otros datos brutos o generados
 *.csv
 *.sav
@@ -29,25 +23,22 @@ looker/
 *.log
 *.out
 *.m4a
-
 # Cache de paquetes
 .Rcheck/
 __pycache__/
 *.pyc
-
 # Archivos de sistema (Windows/macOS)
 .DS_Store
 Thumbs.db
-
 # Node / web (por si usas Quarto, R Shiny, etc.)
 node_modules/
 dist/
 build/
-
 # NO ignorar el archivo .Rproj
 !*.Rproj
 *.rds
 .Rproj.user
 .httr-oauth
 .quarto
+.secrets
 *.gsheet

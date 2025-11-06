@@ -74,4 +74,9 @@ TAB_ALERTAS <- "alertas"   # nombre de pestaña para rectores
 
 export_sheet(alertas, sheet_ss, TAB_ALERTAS, label = "auditoría rectores", pause = 1)
 
+# Exportar tabla por colegios
+if (exists("colegios_rectores") && is.data.frame(colegios_rectores)) {
+  export_sheet(colegios_rectores, sheet_ss, "colegios_rectores", label = "colegios_rectores", pause = 1)
+}
+
 message("✅ Export Rectores LF finalizado.")
