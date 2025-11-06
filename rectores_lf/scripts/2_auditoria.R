@@ -65,10 +65,11 @@ fix_ids <- c(
   "uuid:87e4e7c1-8ccd-4b95-a99a-660269c4a741",
   "uuid:9170532e-51fb-4769-9e8a-7c53f409e9cc",
   "uuid:8b8e8123-d77f-4f8f-9062-03a741dc87ae",
-  "uuid:323a8f45-947a-4f54-89e5-3bbb5d36b6fe"
+  "uuid:323a8f45-947a-4f54-89e5-3bbb5d36b6fe",
+  "uuid:37f61a11-da19-4af7-8192-1a3bb1f5aacf"
 )
-fix_rector <- c(2,2,1,2,2,2,2,2,1,2,2,1,2,2,1,2,2,1,2,2,2,2,2)
-fix_cargo  <- c(2,2,NA,3,3,1,3,2,NA,2,3,NA,1,3,NA,3,3,NA,2,2,3,3,2)
+fix_rector <- c(2,2,1,2,2,2,2,2,1,2,2,1,2,2,1,2,2,1,2,2,2,2,2,2)
+fix_cargo  <- c(2,2,NA,3,3,1,3,2,NA,2,3,NA,1,3,NA,3,3,NA,2,2,3,3,2,3)
 
 lk_rector <- tibble::tibble(instanceID = fix_ids, rector_fix = fix_rector, cargo_fix = fix_cargo)
 
@@ -262,6 +263,68 @@ alertas <- alertas %>%
     exitos  = as.integer(rechazos == 0 & alertas == 0)
   )
 
+# ===== Tabla por COLEGIOS (con TRATAMIENTO) ==================================
+safe_lib(c("dplyr","stringr","readr"))
+
+# 1) Leer la referencia de colegios (COD_DANE, EST_EDUC, TRATAMIENTO)
+colegios_ref <- readr::read_csv("adjunto_colegio.csv", show_col_types = FALSE)
+
+# Normalizamos y nos quedamos con lo necesario
+colegios_base <- colegios_ref %>%
+  dplyr::transmute(
+    id_colegio            = stringr::str_pad(as.character(COD_DANE), 12, pad = "0"),
+    teacher_school_label  = as.character(EST_EDUC),
+    # TRATAMIENTO a dummy 0/1 de forma robusta
+    TRATAMIENTO = {
+      v <- as.character(TRATAMIENTO)
+      vn <- suppressWarnings(as.numeric(v))
+      # si viene texto, mapeamos a 0/1
+      ifelse(
+        is.na(vn),
+        ifelse(toupper(trimws(v)) %in% c("1","SI","SÍ","TRUE","TRATAMIENTO","T"), 1L,
+               ifelse(toupper(trimws(v)) %in% c("0","NO","FALSE","CONTROL","C"), 0L, NA_integer_)),
+        as.integer(vn)
+      )
+    }
+  )
+
+# 2) Colegios a excluir (no deben aparecer)
+colegios_excluir <- c("111001012360","111001076767","111001800694",
+                      "111001107778","111001001279","111001801268","111001015601")
+
+colegios_base <- colegios_base %>%
+  dplyr::filter(!id_colegio %in% colegios_excluir) %>%
+  dplyr::distinct(id_colegio, .keep_all = TRUE)
+
+# 3) Conteo de representantes por colegio desde la base auditada
+#    (representante = flag_rector == 0 y encuesta no rechazada)
+#    p108 es el código de 12 dígitos del colegio en la encuesta
+id_enc_col <- if ("p108" %in% names(alertas)) "p108" else NA_character_
+
+conteo_repres <- alertas %>%
+  dplyr::mutate(
+    id_colegio = if (!is.na(id_enc_col))
+      stringr::str_pad(as.character(.data[[id_enc_col]]), 12, pad = "0")
+    else NA_character_,
+    valido_representante = (flag_rector == 0 & rechazos == 0)
+  ) %>%
+  dplyr::group_by(id_colegio) %>%
+  dplyr::summarise(n_repres = sum(valido_representante, na.rm = TRUE), .groups = "drop")
+
+# 4) Armar la tabla final de colegios (incluye TODOS los colegios de la ref,
+#    aunque no tengan encuesta aún -> n_repres = 0)
+colegios_rectores <- colegios_base %>%
+  dplyr::left_join(conteo_repres, by = "id_colegio") %>%
+  dplyr::mutate(
+    n_repres    = dplyr::coalesce(n_repres, 0L),
+    TRATAMIENTO = dplyr::coalesce(TRATAMIENTO, 0L)  # si faltara, asumimos 0
+  ) %>%
+  dplyr::select(id_colegio, teacher_school_label, TRATAMIENTO, n_repres) %>%
+  dplyr::arrange(id_colegio)
+
+
+# (Opcional) chequeo rápido de filas esperadas
+message("colegios_rectores: filas = ", nrow(colegios_rectores))
 
 # 9) ORDEN DE COLUMNAS --------------------------------------------------------
 #  (i) columnas crudas del import en su orden, (ii) m_*, (iii) total_missings,

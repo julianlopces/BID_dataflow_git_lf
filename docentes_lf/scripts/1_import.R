@@ -78,7 +78,7 @@ data <- data %>%
 data <- data %>%
   mutate(
     tf2_clean = dplyr::na_if(stringr::str_squish(teacher_fullname2), ""),
-    tf2_clean = dplyr::if_else(tf2_clean %in% c("99","9999"), NA_character_, tf2_clean),
+    tf2_clean = dplyr::if_else(tf2_clean %in% c("99","999","99999","9999","999999","999999","99999999","999999999"), NA_character_, tf2_clean),
     teacher_fullname = stringr::str_to_upper(dplyr::coalesce(tf2_clean, nombre_b1, nombre_b2)),
     teacher_fullname = dplyr::if_else(is.na(teacher_fullname) | stringr::str_squish(teacher_fullname) == "",
                                       NA_character_, teacher_fullname)
@@ -86,27 +86,30 @@ data <- data %>%
   select(-nombre_b1, -nombre_b2, -tf2_clean)
 
 # 4) ID unificado de docente ---------------------------------------------------
-# id_docentes_lf = "nombre_con_guiones_bajos" + "_" + "teacher_school"
-# (normalizamos acentos y caracteres no alfanuméricos)
-slugify <- function(x) {
+# id_docentes_lf = NOMBRE_EN_MAYUS_CON_GUIONES + "_" + COLEGIO_EN_MAYUS_CON_GUIONES
+# (sin tildes ni símbolos, solo A–Z, 0–9 y "_")
+
+slugify_upper <- function(x) {
   x <- as.character(x)
-  x <- iconv(x, to = "ASCII//TRANSLIT")                  # quita acentos
-  x <- stringr::str_to_lower(x)
-  x <- stringr::str_replace_all(x, "[^a-z0-9]+", "_")    # todo lo que no sea a-z0-9 -> "_"
-  x <- stringr::str_replace_all(x, "^_+|_+$", "")        # bordes
-  x <- stringr::str_replace_all(x, "_{2,}", "_")         # dobles
+  x <- stringi::stri_trans_general(x, "Latin-ASCII")          # quita acentos
+  x <- stringr::str_to_upper(x)                               # MAYÚSCULAS
+  x <- stringr::str_replace_all(x, "[^A-Z0-9]+", "_")         # no alfanumérico -> "_"
+  x <- stringr::str_replace_all(x, "^_+|_+$", "")             # quita "_" al inicio/fin
+  x <- stringr::str_replace_all(x, "_{2,}", "_")              # colapsa "__" -> "_"
   x
 }
 
 data <- data %>%
   mutate(
     teacher_school = as.character(teacher_school),
-    nombre_slug    = slugify(teacher_fullname),
-    colegio_slug   = slugify(teacher_school),
-    id_docentes_lf = dplyr::if_else(!is.na(nombre_slug) & nombre_slug != "" &
-                                      !is.na(colegio_slug) & colegio_slug != "",
-                                    paste0(nombre_slug, "_", colegio_slug),
-                                    NA_character_)
+    nombre_slug    = slugify_upper(teacher_fullname),
+    colegio_slug   = slugify_upper(teacher_school),
+    id_docentes_lf = dplyr::if_else(
+      !is.na(nombre_slug) & nombre_slug != "" &
+        !is.na(colegio_slug) & colegio_slug != "",
+      paste0(nombre_slug, "_", colegio_slug),
+      NA_character_
+    )
   ) %>%
   select(-nombre_slug, -colegio_slug)
 
