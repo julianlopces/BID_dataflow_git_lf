@@ -106,9 +106,12 @@ alertas <- alertas %>%
     flag_duration_menos = if_else(!is.na(z_dur) & z_dur < -3, 1L, 0L)
   )
 
-# 2) Missings -----------------------------------------------------------------
+# 2) Missings ---------------------------------------------------------------
+
+# --- lista base de variables para m_* ---
 var_missing <- c(
   "teacher_loc","teacher_school",
+  # estas 4 serán condicionales: solo cuentan si teacher_group == 1
   "historias","retos","juegos","intencion_implementacion",
   "filtro_lb",
   "gad_1","gad_2","gad_3","gad_4","gad_5","gad_6","gad_7",
@@ -128,21 +131,43 @@ var_missing <- c(
   "perseverance",
   paste0("eyes_test_",1:36)
 )
-present <- intersect(var_missing, names(alertas))
-if (length(present)){
+
+# separa las 4 condicionales
+cond_vars <- c("historias","retos","juegos","intencion_implementacion")
+
+present_all  <- intersect(var_missing, names(alertas))
+present_cond <- intersect(cond_vars,    present_all)
+present_gen  <- setdiff(present_all,    cond_vars)
+
+# helper de "celda vacía"
+is_blank <- function(x) is.na(x) | trimws(as.character(x)) == ""
+
+# m_* generales (sin condición)
+if (length(present_gen)) {
   alertas <- alertas %>%
-    mutate(across(all_of(present),
-                  ~ if_else(is.na(.x) | trimws(as.character(.x))=="", 1L, 0L),
+    mutate(across(all_of(present_gen),
+                  ~ if_else(is_blank(.x), 1L, 0L),
                   .names = "m_{.col}"))
 }
 
-# Missings condicionados (solo si existen esas variables)
+# m_* condicionales: SOLO cuentan si teacher_group == 1; en otro caso valen 0
+tg_num <- suppressWarnings(as.numeric(alertas$teacher_group))
+if (length(present_cond)) {
+  alertas <- alertas %>%
+    mutate(across(
+      all_of(present_cond),
+      ~ if_else(!is.na(tg_num) & tg_num == 1 & is_blank(.x), 1L, 0L),
+      .names = "m_{.col}"
+    ))
+}
+
+# Missings condicionados 
 alertas <- alertas %>%
   mutate(
     sin_director = if ("teacher_director" %in% names(.)) is.na(teacher_director) | trimws(teacher_director)=="" else FALSE,
     
     m_teacher_country_o = if ("teacher_country" %in% names(.) && "teacher_country_o" %in% names(.))
-      if_else(sin_director & is.na(teacher_country_o) & as.numeric(teacher_country) == 98, 1L, 0L) else NULL,
+      if_else(sin_director & is.na(teacher_country_o) & suppressWarnings(as.numeric(teacher_country)) == 98, 1L, 0L) else NULL,
     
     m_teacher_state = if ("teacher_country" %in% names(.) && "teacher_state" %in% names(.))
       if_else(sin_director & is.na(teacher_state) & trimws(as.character(teacher_country)) == "CO", 1L, 0L) else NULL,
@@ -155,6 +180,7 @@ alertas <- alertas %>%
   ) %>%
   select(-sin_director)
 
+# total_missing = número de m_* activados en la fila
 vars_miss <- grep("^m_", names(alertas), value = TRUE)
 if (length(vars_miss)){
   alertas <- alertas %>%
@@ -305,7 +331,7 @@ colegios_match <- unique(lista_match[[1]])
 
 colegios_excluir <- c(
   "111001012360", "111001076767", "111001800694",
-  "111001107778", "111001801268", "111001015601"
+  "111001107778", "111001001279", "111001801268", "111001015601"
 )
 
 alertas <- alertas %>%
@@ -399,7 +425,7 @@ id_tc_tratamiento <- tc %>% dplyr::pull(tratamiento) %>% stats::na.omit() %>% un
 map_turno <- c("1" = "MANANA", "2" = "TARDE", "3" = "UNICA")
 map_salon <- c("6"="501","7"="502","8"="503","9"="504","10"="505","11"="506","12"="507","13"="508","14"="509")
 
-# 4. Pasar a largo, construir ID_TC (tipos armonizados / columnas válidas) ----
+# 4. Pasar a long, construir ID_TC (tipos armonizados / columnas válidas) ----
 cols_fifth_valid <- grep("^teacher_fifth_\\d_\\d+$", names(alertas), value = TRUE)
 
 if (length(cols_fifth_valid)) {
@@ -427,8 +453,8 @@ alertas_long <- alertas %>%
 
 # --- Lista de colegios a excluir (se necesita aquí y luego en el bloque 7) ---
 colegios_excluir <- c(
-  "111001012360","111001076767","111001800694",
-  "111001107778","111001801268","111001015601"
+  "111001012360", "111001076767", "111001800694",
+  "111001107778", "111001001279", "111001801268", "111001015601"
 )
 
 # 5. Resumir por docente → lista de salones + dummies -------------------------
@@ -540,13 +566,125 @@ alertas <- alertas %>%
     knows_tmp = as.character(knows_num),
     hours_tmp = if (length(hours_col))  suppressWarnings(as.numeric(.data[[hours_col[1]]])) else NA_real_
   )
+# --- DOCENTE_CAPA: colegio exacto + al menos 2 palabras en común del nombre ----
+safe_lib(c("dplyr","stringr","stringi","tidyr","readr"))
+
+# 1) Leemos bases_capa (debe tener teacher_school_label y teacher_fullname)
+cap <- readr::read_csv("bases_capa.csv", show_col_types = FALSE)
+
+# 2) Normalizador (mayúsculas, sin tildes, squish)
+norm_txt <- function(x){
+  x <- as.character(x)
+  x <- stringr::str_squish(x)
+  x <- stringi::stri_trans_general(x, "Latin-ASCII")
+  stringr::str_to_upper(x)
+}
+
+# 3) Elegimos columna de nombre en "alertas" (fallbacks por si no existe teacher_fullname)
+nombre_col <- intersect(c("teacher_fullname","fullname1_rector","fullname2"), names(alertas))
+if (length(nombre_col) == 0) {
+  alertas$teacher_fullname <- NA_character_
+  nombre_col <- "teacher_fullname"
+}
+nombre_col <- nombre_col[1]
+
+# 4) Preparar tablas normalizadas
+a4join <- alertas %>%
+  mutate(
+    capa_school = norm_txt(teacher_school_label %||% teacher_school),
+    capa_name   = norm_txt(.data[[nombre_col]])
+  ) %>%
+  select(docente_id, capa_school, capa_name)
+
+cap4join <- cap %>%
+  mutate(
+    capa_school = norm_txt(teacher_school_label),
+    capa_name   = norm_txt(teacher_fullname)
+  ) %>%
+  select(capa_school, capa_name) %>%
+  distinct() %>%
+  mutate(cap_id = dplyr::row_number())  # id para agrupar por persona en la capa
+
+# 5) Tokenizar nombres (una fila por palabra); ignorar vacíos
+tok_clean <- function(df, id_col, school_col, name_col){
+  df %>%
+    filter(!is.na(.data[[name_col]]), .data[[name_col]] != "") %>%
+    mutate(tokens = stringr::str_split(.data[[name_col]], "\\s+")) %>%
+    tidyr::unnest(tokens) %>%
+    mutate(tokens = stringr::str_squish(tokens)) %>%
+    filter(tokens != "")
+}
+
+tokens_a   <- tok_clean(a4join,  "docente_id", "capa_school", "capa_name") %>%
+  select(docente_id, capa_school, token = tokens) %>% distinct()
+
+tokens_cap <- tok_clean(cap4join, "cap_id",    "capa_school", "capa_name") %>%
+  select(cap_id,    capa_school, token = tokens) %>% distinct()
+
+# 6) Cruce por colegio exacto + palabra exacta; contar coincidencias por par docente-cap
+matches <- tokens_a %>%
+  inner_join(tokens_cap, by = c("capa_school", "token")) %>%
+  group_by(docente_id, cap_id) %>%
+  summarise(n_palabras_comunes = n_distinct(token), .groups = "drop") %>%
+  filter(n_palabras_comunes >= 2) %>%
+  distinct(docente_id)
+
+# 7) Marcar docente_capa en alertas
+alertas <- alertas %>%
+  left_join(matches %>% mutate(docente_capa = 1L), by = "docente_id") %>%
+  mutate(docente_capa = dplyr::coalesce(docente_capa, 0L))
+
+# --- Alias robusto para "teacher_class_10" (director de curso) --------------
+# Si no existe, creamos NA; si existe pero es texto, lo convertimos a 0/1/NA
+dir_cols <- intersect(
+  c("teacher_class_10", "teacher_class10", "director_curso", "dir_curso"),
+  names(alertas)
+)
+
+alertas <- alertas %>%
+  dplyr::mutate(
+    teacher_class_10_tmp = if (length(dir_cols)) {
+      v <- .data[[dir_cols[1]]]
+      v <- trimws(as.character(v))
+      v[v == ""] <- NA_character_
+      # normalizamos algunos textos comunes a 0/1
+      v <- dplyr::case_when(
+        v %in% c("1","01","SI","Sí","si","true","TRUE","True") ~ "1",
+        v %in% c("0","00","NO","No","no","false","FALSE","False") ~ "0",
+        TRUE ~ v
+      )
+      suppressWarnings(as.numeric(v))  # <- ahora sí numérica (0/1/NA)
+    } else {
+      NA_real_
+    }
+  )
+
 
 base_long <- if (nrow(alertas_long_in)) {
   alertas_long_in %>%
-    dplyr::left_join(alertas %>% dplyr::select(docente_id, docente_muestra, knows_tmp, hours_tmp), by = "docente_id")
+    dplyr::left_join(
+      alertas %>%
+        dplyr::select(
+          docente_id,
+          docente_muestra,
+          knows_tmp,
+          hours_tmp,
+          docente_capa,
+          teacher_class_10_tmp   # <- usar la versión numérica
+        ),
+      by = "docente_id"
+    )
 } else {
-  tibble::tibble(ID_TC = character(), docente_muestra = integer(), knows_tmp = character(), hours_tmp = numeric())
+  tibble::tibble(
+    ID_TC = character(),
+    docente_muestra = integer(),
+    knows_tmp = character(),
+    hours_tmp = numeric(),
+    docente_capa = integer(),
+    teacher_class_10_tmp = numeric()  # <- columna consistente en el “else”
+  )
 }
+
 
 salones_docentes <- base_long %>%
   dplyr::group_by(ID_TC) %>%
@@ -554,7 +692,10 @@ salones_docentes <- base_long %>%
     flag_muestra        = as.integer(any(docente_muestra == 1, na.rm = TRUE)),
     n_docentes          = dplyr::n(),
     n_docentes_muestra  = sum(docente_muestra == 1, na.rm = TRUE),
-    n_conoce_programa   = sum(docente_muestra == 1 & suppressWarnings(as.numeric(knows_tmp)) == 1, na.rm = TRUE),
+    n_conoce_programa   = sum(docente_muestra == 1 &
+                                suppressWarnings(as.numeric(knows_tmp)) == 1, na.rm = TRUE),
+    n_docentes_capa     = sum(docente_capa == 1, na.rm = TRUE),
+    n_directores        = sum(teacher_class_10_tmp == 1, na.rm = TRUE),  # <- aquí
     flag_horas = {
       x <- suppressWarnings(as.numeric(hours_tmp[docente_muestra == 1]))
       if (length(x) == 0 || all(is.na(x))) NA_integer_ else as.integer(any(x == 1, na.rm = TRUE))
@@ -567,12 +708,41 @@ salones_docentes <- base_long %>%
     n_docentes          = dplyr::coalesce(n_docentes, 0L),
     n_docentes_muestra  = dplyr::coalesce(n_docentes_muestra, 0L),
     n_conoce_programa   = ifelse(tratamiento == 1, dplyr::coalesce(n_conoce_programa, 0L), NA_integer_),
+    n_docentes_capa     = dplyr::coalesce(n_docentes_capa, 0L),
+    n_directores        = dplyr::coalesce(n_directores, 0L),
     flag_horas          = ifelse(tratamiento == 1, flag_horas, NA_integer_)
   ) %>%
   dplyr::left_join(colegio_por_salon, by = c("ID_TC" = "ID_TC")) %>%
   dplyr::rename(salon = ID_TC) %>%
-  dplyr::select(salon, colegio, flag_muestra, n_docentes, n_docentes_muestra,
-                n_conoce_programa, flag_horas, tratamiento)
+  dplyr::select(
+    salon, colegio, flag_muestra,
+    n_docentes, n_docentes_muestra,
+    n_conoce_programa, n_docentes_capa, n_directores,
+    flag_horas, tratamiento
+  )
+
+
+
+
+# --- Completar 'colegio' desde adjunto_colegio.csv cuando esté vacío ----------
+# 1) Leer el adjunto y preparar lookup por COD_DANE (12 dígitos)
+colegios_ref <- readr::read_csv("adjunto_colegio.csv", show_col_types = FALSE)
+
+lk_colegio <- colegios_ref %>%
+  dplyr::transmute(
+    code12   = stringr::str_pad(as.character(COD_DANE), 12, pad = "0"),
+    est_educ = as.character(EST_EDUC)
+  )
+
+# 2) Extraer el código de 12 dígitos del salón y completar 'colegio' cuando falte
+salones_docentes <- salones_docentes %>%
+  dplyr::mutate(code12 = stringr::str_extract(salon, "^\\d{12}")) %>%
+  dplyr::left_join(lk_colegio, by = "code12") %>%
+  dplyr::mutate(
+    colegio = dplyr::coalesce(dplyr::na_if(colegio, ""), est_educ)
+  ) %>%
+  dplyr::select(-code12, -est_educ)
+
 
 # Helper para normalizar flags a 0/1 (sin NA)
 flag0 <- function(x) {
@@ -581,7 +751,7 @@ flag0 <- function(x) {
   y
 }
 
-# 11) Rechazos y totales para Looker ------------------------------------------
+# 11) Rechazos y totales para Looker -----------------------------------------
 if (!"consentimiento" %in% names(alertas)) alertas$consentimiento <- NA
 
 alertas <- alertas %>%
@@ -589,7 +759,7 @@ alertas <- alertas %>%
     flag_rejected       = flag0(suppressWarnings(as.numeric(consentimiento) == 2)),
     flag_duplicated     = flag0(duplicado == 1),
     flag_missing        = flag0(!is.na(total_missing) & total_missing > 0),
-    flag_extreme_values = flag0(flag_extreme_values),             # del paso 4.d corregido
+    flag_extreme_values = flag0(flag_extreme_values),
     flag_duration_mas   = flag0(flag_duration_mas),
     flag_duration_menos = flag0(flag_duration_menos),
     flag_prueba2        = flag0(suppressWarnings(as.numeric(prueba_2)) != 4),
@@ -597,17 +767,22 @@ alertas <- alertas %>%
     flag_ns             = if ("flag_ns" %in% names(.)) flag0(flag_ns) else 0L,
     flag_knows          = dplyr::coalesce(as.integer(knows_num == 2), 0L)
   ) %>%
-  # Suma de flags "malas" → 0 = Exitos, >0 = Alertas
+  # Suma de flags EXCLUYENDO flag_rejected
   mutate(
-    bad_flags_sum =
+    sum_flags_sin_rechazo =
       flag_duration_mas + flag_duration_menos +
       flag_duplicated   + flag_missing        +
       flag_extreme_values + flag_ns +
-      flag_rejected     + flag_prueba2 + flag_prueba50 +
-      flag_knows,
-    Exitos  = as.integer(bad_flags_sum == 0L),
-    Alertas = as.integer(bad_flags_sum >  0L),
+      flag_prueba2 + flag_prueba50 + flag_knows,
+    
+    # Reglas:
+    # - Si flag_rejected == 1 -> Rechazos=1, Alertas=0, Exitos=0
+    # - Si flag_rejected == 0 -> Alertas = (sum_flags_sin_rechazo > 0), Exitos = (Alertas == 0)
     Rechazos = flag_rejected,
+    Alertas  = if_else(flag_rejected == 1L, 0L, as.integer(sum_flags_sin_rechazo > 0L)),
+    Exitos   = if_else(flag_rejected == 1L, 0L, if_else(Alertas == 1L, 0L, 1L)),
+    
+    # Etiquetas (opcionales)
     tiempos_anomalos_mas   = if_else(flag_duration_mas==1L, "Sí", "No"),
     tiempos_anomalos_menos = if_else(flag_duration_menos==1L, "Sí", "No"),
     duplicado_lbl          = if_else(flag_duplicated==1L, "Sí", "No"),
@@ -615,7 +790,8 @@ alertas <- alertas %>%
     valores_extremos       = if_else(flag_extreme_values==1L, "Sí", "No"),
     exceso_ns              = if ("flag_ns" %in% names(.)) if_else(flag_ns==1L,"Sí","No") else NA_character_
   ) %>%
-  select(-bad_flags_sum)
+  select(-sum_flags_sin_rechazo)
+
 
 # 9) Orden de columnas --------------------------------------------------------
 alertas <- tibble::as_tibble(alertas)
