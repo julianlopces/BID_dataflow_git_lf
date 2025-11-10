@@ -97,8 +97,6 @@ colegios_priorizados <- seguimiento_colegios_detalle_final %>%
 
 # Reporte condensado
 
-colegios_priorizados <- read_sheet("1rwGebhR5HBNukMgRCHMQ6w2j9silfhNLPVAN0xUNQy8",sheet = "colegios_priorizados")
-
 colegios_sin_docentes  <- read_sheet("1rwGebhR5HBNukMgRCHMQ6w2j9silfhNLPVAN0xUNQy8",sheet = "colegios_sin_docente")[,c(1:4)]
 
 colegios_sin_rectores <- read_sheet("1rwGebhR5HBNukMgRCHMQ6w2j9silfhNLPVAN0xUNQy8",sheet = "colegios_sin_rector")[,c(1:3)]
