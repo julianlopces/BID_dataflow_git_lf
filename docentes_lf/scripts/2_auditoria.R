@@ -725,7 +725,7 @@ salones_docentes <- base_long %>%
 
 
 # --- Completar 'colegio' desde adjunto_colegio.csv cuando esté vacío ----------
-# 1) Leer el adjunto y preparar lookup por COD_DANE (12 dígitos)
+# 1) Leer el adjunto y preparar lookup por COD_DANE
 colegios_ref <- readr::read_csv("adjunto_colegio.csv", show_col_types = FALSE)
 
 lk_colegio <- colegios_ref %>%
@@ -743,6 +743,18 @@ salones_docentes <- salones_docentes %>%
   ) %>%
   dplyr::select(-code12, -est_educ)
 
+# --- Flags por tratamiento/control -------------------------------------------
+salones_docentes <- salones_docentes %>%
+  dplyr::mutate(
+    flag_trat = as.integer(tratamiento == 1 & (is.na(n_conoce_programa) | n_conoce_programa == 0)),
+    flag_con  = as.integer(tratamiento == 0 & (is.na(n_directores)       | n_directores       == 0))
+  )
+
+# --- Tabla "colegios_sin_docente" (solo donde falta algo según flags) --------
+colegios_sin_docente <- salones_docentes %>%
+  dplyr::filter(flag_trat == 1L | flag_con == 1L) %>%
+  # Tratamiento como 3ra columna (después de 'colegio')
+  dplyr::relocate(tratamiento, .after = colegio)
 
 # Helper para normalizar flags a 0/1 (sin NA)
 flag0 <- function(x) {

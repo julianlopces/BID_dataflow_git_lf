@@ -13,7 +13,7 @@ if (!exists("salones_docentes")) stop("No existe 'salones_docentes'. Corre 2_aud
 if (!nzchar(id_alertas)) stop("id_alertas vacío.")
 if (!file.exists(temp_creds_file)) stop("No existe temp_creds_file: ", temp_creds_file)
 
-# --- Auth + logs ---
+# -- Auth + logs ---
 suppressMessages({
   googledrive::drive_auth(path = temp_creds_file, cache = ".secrets")
   googlesheets4::gs4_auth(path = temp_creds_file)
@@ -89,5 +89,8 @@ export_sheet(alertas,          sheet_ss, TAB_ALERTAS, label = "alertas docentes"
 export_sheet(data,             sheet_ss, TAB_RAW,     label = "datos crudos",       pause = 1)
 export_sheet(resumen_doc,      sheet_ss, TAB_RESUMEN, label = "resumen",            pause = 1)
 export_sheet(salones_docentes, sheet_ss, TAB_SALONES, label = "salones_docentes",   pause = 1)
-
+if (exists("colegios_sin_docente") && is.data.frame(colegios_sin_docente)) {
+  export_sheet(colegios_sin_docente, sheet_ss, "colegios_sin_docente",
+               label = "colegios_sin_docente", pause = 1)
+}
 message("✅ Export Docentes LF finalizado.")

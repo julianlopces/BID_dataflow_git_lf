@@ -113,7 +113,7 @@ data <- data %>%
   ) %>%
   select(-nombre_slug, -colegio_slug)
 
-# 5) Guardado --------------------------------------------------------------
+# 5) Guardado -------------------------------------------------------------
 if (!dir.exists("docentes_lf/data")) dir.create("docentes_lf/data", recursive = TRUE)
 tag <- format(Sys.time(), "%Y%m%d_%H%M")
 write.csv(data, file = file.path("docentes_lf","data", paste0("docentes_LF_raw_", tag, ".csv")), row.names = FALSE)
