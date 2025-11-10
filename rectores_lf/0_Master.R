@@ -19,7 +19,7 @@ server          <- Sys.getenv("SERVIDOR")
 email           <- Sys.getenv("EMAIL_DOCENTES", unset = Sys.getenv("EMAIL"))
 password        <- Sys.getenv("PASSWORD_DOCENTES", unset = Sys.getenv("PASSWORD"))
 formid          <- Sys.getenv("FORMID_RECTORES")
-temp_creds_file <- Sys.getenv("GOOGLE_SHEETS_CREDENTIALS")  # p.ej. "config/credentials_cloud.json"
+temp_creds_file <- Sys.getenv("GOOGLE_SHEETS_CREDENTIALS")  
 id_alertas      <- Sys.getenv("IDALERTASRE")
 
 assign("server",          server,          .GlobalEnv)

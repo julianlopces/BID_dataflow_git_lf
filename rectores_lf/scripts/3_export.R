@@ -16,7 +16,7 @@ if (!exists("temp_creds_file") || !nzchar(temp_creds_file)) {
 }
 # Para el ID del Google Sheets de rectores:
 # En tu master lo pusiste como id_alertas <- Sys.getenv("IDALERTASRE")
-# Respetamos 'id_alertas' si existe; si no, probamos con la env var.
+# Respetamos 'id_alertas' si existe; si no, probamos con la env.
 if (!exists("id_alertas") || !nzchar(id_alertas)) {
   id_alertas <- Sys.getenv("IDALERTASRE")
 }
@@ -77,6 +77,12 @@ export_sheet(alertas, sheet_ss, TAB_ALERTAS, label = "auditoría rectores", paus
 # Exportar tabla por colegios
 if (exists("colegios_rectores") && is.data.frame(colegios_rectores)) {
   export_sheet(colegios_rectores, sheet_ss, "colegios_rectores", label = "colegios_rectores", pause = 1)
+}
+
+# Exportar tabla de colegios SIN rector
+if (exists("colegios_sin_rector") && is.data.frame(colegios_sin_rector)) {
+  export_sheet(colegios_sin_rector, sheet_ss, "colegios_sin_rector",
+               label = "colegios_sin_rector", pause = 1)
 }
 
 message("✅ Export Rectores LF finalizado.")
