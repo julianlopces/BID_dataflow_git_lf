@@ -94,7 +94,7 @@ data <- df %>%
     fullname2        = fullname2,
     id_rector        = id_rector
   ) %>%
-  # convertir strings vacíos a NA
+  # convertir vacíos a NA
   mutate(across(where(is.character), ~na_if(.x, ""))) %>%
   tibble::as_tibble()
 
