@@ -59,7 +59,10 @@ lista_estudiantes  <- read_sheet(id_alertas,
   filter(!ID %in% ID_lbase_corregido$ID )
 
 lista_estudiantes_pendiente <- lista_estudiantes %>%
-  filter(!ID %in% alertas_sin_duplicados$student_id_final)
+  filter(!ID %in% alertas_sin_duplicados$student_id_final)%>%
+  filter(!as.character(COD_COLEGIO) %in% c("111001016101",
+                                          "111001100072",
+                                          "111001801101"))
 
 
 
@@ -79,7 +82,11 @@ seguimiento_colegios_detalle_final <- seguimiento_colegios_detalle %>%
   left_join(pendiente_estudiantes_colegios, by = "COD_COLEGIO")%>%
   mutate(estado_conocido = (l_base/TOTAL_LB)*100,
          estado_conocido = if_else(estado_conocido > 100,100,estado_conocido))%>%
-  arrange(desc(estado_conocido))
+  arrange(desc(estado_conocido))%>%
+  filter(!as.character(COD_COLEGIO) %in% c("111001016101",
+                                           "111001100072",
+                                           "111001801101"))
+  
 
 
 # Colegios priorizados
@@ -115,6 +122,9 @@ Resumen_colegios <- bind_rows(
     Faltan_docentes = if_else(cod_colegio %in% colegios_sin_docentes$id_colegio,"Sí","NO"),
     Faltan_rectores = if_else(cod_colegio %in% colegios_sin_rectores$id_colegio,"Sí","NO")
   )%>%
-  left_join(tratamiento,by = c("cod_colegio" = "COD_COLEGIO"))
+  left_join(tratamiento,by = c("cod_colegio" = "COD_COLEGIO"))%>%
+  filter(!as.character(cod_colegio) %in% c("111001016101",
+                                           "111001100072",
+                                           "111001801101"))
 
 
