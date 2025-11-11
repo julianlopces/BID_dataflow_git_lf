@@ -654,6 +654,7 @@ alertas <- alertas %>%
 # Separar los que tienen y no tienen ID
 con_id <- alertas %>%
   filter(!is.na(student_id)) %>%
+  mutate(endtime = mdy_hms(endtime))%>%
   arrange(endtime)%>%
   group_by(student_id)%>%
   mutate(intento = row_number())%>%
@@ -661,7 +662,8 @@ con_id <- alertas %>%
 
 
 sin_id <- alertas %>%
-  filter(is.na(student_id))
+  filter(is.na(student_id))%>%
+  mutate(endtime = mdy_hms(endtime))
 
 # Unirlos nuevamente
 alertas_sin_duplicados <- bind_rows(con_id, sin_id)
