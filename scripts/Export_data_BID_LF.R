@@ -75,6 +75,6 @@ sheet3 <- tryCatch({
   stop("Error al conectar con el Google Sheet de alertas: ", e)
 })
 
-export_sheet(data_cruda, sheet3, "Resumen_colegios", label = "Data cruda",pause = 5)
+export_sheet(data_cruda, sheet3, "Data_cruda", label = "Data cruda",pause = 5)
 
 message("✅ Todos los datos fueron exportados exitosamente.")
