@@ -654,12 +654,16 @@ alertas <- alertas %>%
 # Separar los que tienen y no tienen ID
 con_id <- alertas %>%
   filter(!is.na(student_id)) %>%
-  mutate(endtime = mdy_hms(endtime))%>%
-  arrange(endtime)%>%
-  group_by(student_id)%>%
-  mutate(intento = row_number())%>%
-  filter(intento == max(intento))
-
+  mutate(endtime = mdy_hms(endtime)) %>%
+  arrange(student_id, endtime) %>%
+  group_by(student_id) %>%
+  mutate(intento = row_number()) %>%
+  filter(
+    # si hay intentos con assent == 1, quedarte con el último de esos
+    if (any(assent == 1)) intento == max(intento[assent == 1])
+    # si no hay ningún assent == 1, quedarte con el máximo intento
+    else intento == max(intento)
+  )
 
 sin_id <- alertas %>%
   filter(is.na(student_id))%>%
