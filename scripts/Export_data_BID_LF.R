@@ -61,4 +61,20 @@ export_sheet(seguimiento_colegios_detalle_final, sheet2, "seguimiento_colegios",
 export_sheet(lista_estudiantes_pendiente, sheet2, "estudiantes_faltantes", label = "estudiantes faltantes",pause = 5)
 export_sheet(colegios_priorizados, sheet2, "colegios_priorizados", label = "estudiantes faltantes",pause = 5)
 export_sheet(Resumen_colegios, sheet2, "Resumen_colegios", label = "Resumen colegios",pause = 5)
+
+
+
+# Exportar datos crudos
+
+data_cruda <- data %>%
+  filter(KEY %in% alertas_sin_duplicados$KEY & assent == 1)
+
+sheet3 <- tryCatch({
+  gs4_get("1lhAGQKSJvyI5cUiOi5vjNhE7gRNMbRay3VA3q88XuPg")
+}, error = function(e) {
+  stop("Error al conectar con el Google Sheet de alertas: ", e)
+})
+
+export_sheet(data_cruda, sheet3, "Resumen_colegios", label = "Data cruda",pause = 5)
+
 message("✅ Todos los datos fueron exportados exitosamente.")
