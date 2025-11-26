@@ -42,3 +42,5 @@ build/
 .quarto
 .secrets
 *.gsheet
+/limpieza
+scripts/Limpieza_base_R.R
