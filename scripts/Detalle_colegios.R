@@ -8,7 +8,7 @@ seguimiento_colegios_lb <- alertas_sin_duplicados %>%
     colegio_final = coalesce(colegio_str, colegio_pull),
     school_final  = coalesce(colegio_pull_id, school_final),
     # convertir "1"/"0" a lógico
-    lb_flag = lb_pull == "1"
+    lb_flag = if_else(lb_pull == "1", TRUE, FALSE, missing = FALSE)
   ) %>%
   filter(!is.na(school_final)) %>%
   group_by(school_final) %>%
